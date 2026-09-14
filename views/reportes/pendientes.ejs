@@ -13,47 +13,55 @@
 <div class="accordion" id="accordionPendientes">
     <% Object.entries(alumnos_por_eval).forEach(([ev_id, recs], idx) => { %>
     <% const ev = recs[0].evaluacion || { titulo: 'Evaluación', curso: {}, asignatura: {}, profesor: {} }; %>
-    <div class="accordion-item mb-2 border rounded">
+    <div class="accordion-item mb-3 border rounded shadow-sm">
         <h2 class="accordion-header">
             <button class="accordion-button <%= idx !== 0 ? 'collapsed' : '' %>" type="button" data-bs-toggle="collapse" data-bs-target="#collapse<%= ev_id %>">
-                <div class="d-flex justify-content-between w-100 pe-3 align-items-center">
-                    <span><i class="bi bi-clipboard-check me-2 text-primary"></i><strong><%= ev.titulo %></strong></span>
+                <div class="d-flex flex-wrap justify-content-between w-100 pe-2 pe-sm-3 align-items-center gap-2">
+                    <span class="me-2"><i class="bi bi-clipboard-check me-2 text-primary"></i><strong><%= ev.titulo %></strong></span>
                     <span class="badge bg-warning text-dark"><%= recs.length %> alumno(s)</span>
                 </div>
             </button>
         </h2>
         <div id="collapse<%= ev_id %>" class="accordion-collapse collapse <%= idx === 0 ? 'show' : '' %>" data-bs-parent="#accordionPendientes">
             <div class="accordion-body">
-                <div class="mb-3 small text-muted">
-                    <%= ev.curso ? ev.curso.nombre : '' %> &bull; <%= ev.asignatura ? ev.asignatura.nombre : '' %> &bull; Fecha original: <%= ev.fecha %> &bull; Profesor: <%= ev.profesor ? ev.profesor.nombre_completo : '' %>
+                <div class="mb-3 small text-muted d-flex flex-wrap gap-2 align-items-center">
+                    <span><i class="bi bi-mortarboard me-1"></i><strong><%= ev.curso ? ev.curso.nombre : '' %></strong></span>
+                    <span>&bull;</span>
+                    <span><i class="bi bi-book me-1"></i><%= ev.asignatura ? ev.asignatura.nombre : '' %></span>
+                    <span>&bull;</span>
+                    <span><i class="bi bi-calendar-event me-1"></i>Fecha orig: <%= ev.fecha %></span>
+                    <span>&bull;</span>
+                    <span><i class="bi bi-person me-1"></i>Profesor: <%= ev.profesor ? ev.profesor.nombre_completo : '' %></span>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle">
-                        <thead>
+
+                <!-- Tabla para PC, Laptop y Tablet -->
+                <div class="table-responsive d-none d-md-block">
+                    <table class="table table-sm align-middle mb-0" style="min-width: 620px;">
+                        <thead class="table-light">
                             <tr>
-                                <th>Alumno</th>
-                                <th>RUT</th>
-                                <th>F. Recuperación</th>
-                                <th>Exigencia</th>
-                                <th>Motivo</th>
-                                <th class="text-end">Acción</th>
+                                <th style="min-width: 140px;">Alumno</th>
+                                <th class="nowrap" style="min-width: 95px;">RUT</th>
+                                <th class="nowrap" style="min-width: 110px;">F. Recuperación</th>
+                                <th class="nowrap" style="min-width: 85px;">Exigencia</th>
+                                <th style="min-width: 120px;">Motivo</th>
+                                <th class="text-end nowrap" style="min-width: 100px;">Acción</th>
                             </tr>
                         </thead>
                         <tbody>
                             <% recs.forEach(rec => { %>
                             <tr>
                                 <td><strong><%= rec.alumno ? rec.alumno.nombre_completo : 'Alumno' %></strong></td>
-                                <td class="text-muted"><%= rec.alumno ? rec.alumno.rut : '' %></td>
-                                <td><span class="badge bg-warning text-dark"><%= rec.fecha_recuperacion %></span></td>
-                                <td>
+                                <td class="text-muted nowrap"><%= rec.alumno ? rec.alumno.rut : '' %></td>
+                                <td class="nowrap"><span class="badge bg-warning text-dark"><%= rec.fecha_recuperacion %></span></td>
+                                <td class="nowrap">
                                     <% if (Number(rec.porcentaje_exigencia) >= 70) { %>
-                                    <span class="badge bg-danger">70%</span>
+                                    <span class="badge bg-danger" title="Injustificado (70%)">70%</span>
                                     <% } else { %>
-                                    <span class="badge bg-success">60%</span>
+                                    <span class="badge bg-success" title="Justificado (60%)">60%</span>
                                     <% } %>
                                 </td>
                                 <td class="small text-muted"><%= rec.motivo || '-' %></td>
-                                <td class="text-end">
+                                <td class="text-end nowrap">
                                     <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="d-inline">
                                         <button type="submit" class="btn btn-sm btn-success" title="Marcar completada"><i class="bi bi-check-lg me-1"></i>Completar</button>
                                     </form>
@@ -63,6 +71,40 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Tarjetas responsivas (wrap) para Móvil / Celular -->
+                <div class="d-md-none">
+                    <div class="row g-2">
+                        <% recs.forEach(rec => { %>
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded border">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <div>
+                                        <div class="fw-bold"><%= rec.alumno ? rec.alumno.nombre_completo : 'Alumno' %></div>
+                                        <div class="small text-muted"><%= rec.alumno ? rec.alumno.rut : '' %></div>
+                                    </div>
+                                    <span class="badge <%= Number(rec.porcentaje_exigencia) >= 70 ? 'bg-danger' : 'bg-success' %>">
+                                        <%= Math.round(rec.porcentaje_exigencia) %>% Exigencia
+                                    </span>
+                                </div>
+                                <div class="small mb-2">
+                                    <span class="text-muted">Fecha recuperación:</span>
+                                    <span class="badge bg-warning text-dark ms-1"><%= rec.fecha_recuperacion %></span>
+                                </div>
+                                <% if (rec.motivo) { %>
+                                <div class="small text-muted mb-2 fst-italic">
+                                    <%= rec.motivo %>
+                                </div>
+                                <% } %>
+                                <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="mt-2 pt-2 border-top">
+                                    <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-check-lg me-1"></i>Marcar Rendida</button>
+                                </form>
+                            </div>
+                        </div>
+                        <% }) %>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

@@ -15,7 +15,7 @@
 
 <div class="card mb-4">
     <div class="card-body py-3">
-        <div class="btn-group" role="group">
+        <div class="d-flex flex-wrap gap-2" role="group">
             <a href="/recuperaciones" class="btn btn-sm <%= !filtros.estado ? 'btn-primary' : 'btn-outline-primary' %>">Todas</a>
             <a href="/recuperaciones?estado=pendiente" class="btn btn-sm <%= filtros.estado === 'pendiente' ? 'btn-warning' : 'btn-outline-warning' %>">Pendientes</a>
             <a href="/recuperaciones?estado=completada" class="btn btn-sm <%= filtros.estado === 'completada' ? 'btn-success' : 'btn-outline-success' %>">Completadas</a>
@@ -27,18 +27,19 @@
 <div class="card">
     <div class="card-body p-0">
         <% if (recuperaciones.length > 0) { %>
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
+        <!-- Vista de tabla para PC, Laptop y Tablets -->
+        <div class="table-responsive d-none d-md-block">
+            <table class="table table-hover mb-0 align-middle" style="min-width: 720px;">
                 <thead class="table-light">
                     <tr>
-                        <th>Alumno</th>
-                        <th>Evaluación original</th>
-                        <th>Fecha original</th>
-                        <th>Fecha recuperación</th>
-                        <th>Exigencia</th>
-                        <th>Motivo</th>
-                        <th>Estado</th>
-                        <th class="text-end">Acciones</th>
+                        <th style="min-width: 140px;">Alumno</th>
+                        <th style="min-width: 150px;">Evaluación original</th>
+                        <th class="nowrap">Fecha original</th>
+                        <th class="nowrap">Fecha recup.</th>
+                        <th class="nowrap">Exigencia</th>
+                        <th style="min-width: 120px;">Motivo</th>
+                        <th class="nowrap">Estado</th>
+                        <th class="text-end nowrap">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -55,11 +56,11 @@
                                 <%= rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' %>
                             </a>
                         </td>
-                        <td><%= rec.evaluacion ? rec.evaluacion.fecha : '-' %></td>
-                        <td>
+                        <td class="nowrap"><%= rec.evaluacion ? rec.evaluacion.fecha : '-' %></td>
+                        <td class="nowrap">
                             <span class="fw-semibold"><%= rec.fecha_recuperacion %></span>
                         </td>
-                        <td>
+                        <td class="nowrap">
                             <% if (Number(rec.porcentaje_exigencia) >= 70) { %>
                             <span class="badge bg-danger" title="Sin justificar (70%)"><%= Math.round(rec.porcentaje_exigencia) %>%</span>
                             <% } else { %>
@@ -67,7 +68,7 @@
                             <% } %>
                         </td>
                         <td class="text-muted small"><%= rec.motivo || '-' %></td>
-                        <td>
+                        <td class="nowrap">
                             <% if (rec.estado === 'pendiente') { %>
                             <span class="badge bg-warning text-dark">Pendiente</span>
                             <% } else if (rec.estado === 'completada') { %>
@@ -76,7 +77,7 @@
                             <span class="badge bg-secondary">Cancelada</span>
                             <% } %>
                         </td>
-                        <td class="text-end">
+                        <td class="text-end nowrap">
                             <% if (rec.estado === 'pendiente' && ['utp','profe','inspe'].includes(current_user.rol)) { %>
                             <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="d-inline">
                                 <button type="submit" class="btn btn-sm btn-success" title="Marcar completada"><i class="bi bi-check-lg"></i></button>
@@ -90,6 +91,62 @@
                     <% }) %>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Vista de tarjetas móviles (wrap natural) para Celulares -->
+        <div class="d-md-none p-3">
+            <div class="row g-3">
+                <% recuperaciones.forEach(rec => { %>
+                <div class="col-12">
+                    <div class="p-3 bg-light rounded border">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div>
+                                <a href="/alumnos/<%= rec.alumno_id %>" class="fw-bold text-decoration-none">
+                                    <%= rec.alumno ? rec.alumno.nombre_completo : 'Alumno' %>
+                                </a>
+                                <div class="small text-muted"><%= (rec.alumno && rec.alumno.curso) ? rec.alumno.curso.nombre : '' %></div>
+                            </div>
+                            <% if (rec.estado === 'pendiente') { %>
+                            <span class="badge bg-warning text-dark">Pendiente</span>
+                            <% } else if (rec.estado === 'completada') { %>
+                            <span class="badge bg-success">Completada</span>
+                            <% } else { %>
+                            <span class="badge bg-secondary">Cancelada</span>
+                            <% } %>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Evaluación:</span>
+                            <a href="/evaluaciones/<%= rec.evaluacion_id %>" class="text-decoration-none fw-semibold">
+                                <%= rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' %>
+                            </a>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center small my-2">
+                            <span class="badge bg-light text-dark border">
+                                <i class="bi bi-calendar-check me-1"></i>Recup: <%= rec.fecha_recuperacion %>
+                            </span>
+                            <span class="badge <%= Number(rec.porcentaje_exigencia) >= 70 ? 'bg-danger' : 'bg-success' %>">
+                                <%= Math.round(rec.porcentaje_exigencia) %>% Exigencia
+                            </span>
+                        </div>
+                        <% if (rec.motivo) { %>
+                        <div class="small text-muted fst-italic mb-2">
+                            <%= rec.motivo %>
+                        </div>
+                        <% } %>
+                        <% if (rec.estado === 'pendiente' && ['utp','profe','inspe'].includes(current_user.rol)) { %>
+                        <div class="d-flex gap-2 mt-2 pt-2 border-top">
+                            <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="flex-grow-1">
+                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-check-lg me-1"></i>Completar</button>
+                            </form>
+                            <form method="POST" action="/recuperaciones/<%= rec.id %>/cancelar" onsubmit="return confirm('¿Cancelar esta recuperación?')">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Cancelar"><i class="bi bi-x-lg"></i></button>
+                            </form>
+                        </div>
+                        <% } %>
+                    </div>
+                </div>
+                <% }) %>
+            </div>
         </div>
         <% } else { %>
         <div class="text-center py-5 text-muted">

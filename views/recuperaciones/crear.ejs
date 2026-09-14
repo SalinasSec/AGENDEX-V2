@@ -5,10 +5,10 @@
 }) %>
 
 <div class="row justify-content-center">
-    <div class="col-lg-7">
-        <div class="card">
+    <div class="col-12 col-md-10 col-lg-8 col-xl-7">
+        <div class="card shadow-sm">
             <div class="card-header">
-                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise me-2"></i>Asignar Fecha de Recuperación</h5>
+                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Asignar Fecha de Recuperación</h5>
             </div>
             <div class="card-body">
                 <form method="POST" action="/recuperaciones/crear">
@@ -22,7 +22,7 @@
                             <select name="evaluacion_id" id="evalSelect" class="form-select" required>
                                 <option value="">Seleccionar evaluación...</option>
                                 <% evaluaciones.forEach(ev => { %>
-                                <option value="<%= ev.id %>"><%= ev.titulo %> - <%= ev.curso.nombre %> (<%= ev.fecha %>)</option>
+                                <option value="<%= ev.id %>"><%= ev.titulo %> — <%= ev.curso.nombre %> (<%= ev.fecha %>)</option>
                                 <% }) %>
                             </select>
                         </div>
@@ -31,23 +31,30 @@
                             <select name="alumno_id" class="form-select" required>
                                 <option value="">Seleccionar alumno...</option>
                                 <% alumnos.forEach(a => { %>
-                                <option value="<%= a.id %>" <%= alumno_id_preselect == a.id ? 'selected' : '' %>><%= a.nombre_completo %> - <%= a.curso ? a.curso.nombre : '' %></option>
+                                <option value="<%= a.id %>" <%= alumno_id_preselect == a.id ? 'selected' : '' %>><%= a.nombre_completo %> — <%= a.curso ? a.curso.nombre : '' %></option>
                                 <% }) %>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-12 col-sm-6">
                             <label class="form-label">Fecha de recuperación <span class="text-danger">*</span></label>
                             <input type="date" name="fecha_recuperacion" class="form-control" required min="<%= hoy %>" value="<%= hoy %>">
                         </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label">Exigencia reglamentaria</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-shield-check"></i></span>
+                                <input type="text" class="form-control bg-light" value="Automática (60% / 70%)" readonly>
+                            </div>
+                        </div>
                         <div class="col-12">
-                            <label class="form-label">Motivo</label>
-                            <input type="text" name="motivo" class="form-control" placeholder="Ej: Ausencia por licencia médica, inasistencia imprevista...">
+                            <label class="form-label">Motivo o justificación</label>
+                            <input type="text" name="motivo" class="form-control" placeholder="Ej: Ausencia por licencia médica, inasistencia justificada...">
                         </div>
                     </div>
                     <hr>
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="/recuperaciones" class="btn btn-outline-secondary">Cancelar</a>
-                        <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i>Asignar Recuperación</button>
+                    <div class="d-flex flex-wrap justify-content-end gap-2">
+                        <a href="/recuperaciones" class="btn btn-outline-secondary w-100 w-sm-auto text-center">Cancelar</a>
+                        <button type="submit" class="btn btn-warning w-100 w-sm-auto"><i class="bi bi-check-lg me-1"></i>Asignar Recuperación</button>
                     </div>
                 </form>
             </div>

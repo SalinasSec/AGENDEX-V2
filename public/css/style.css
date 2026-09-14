@@ -25,7 +25,7 @@ html, body {
     overflow-x: hidden;
 }
 
-img, svg, video, canvas, table {
+img, svg, video, canvas {
     max-width: 100%;
 }
 
@@ -296,8 +296,41 @@ a:hover { color: var(--mustard-dark); }
 .btn-info { background: #2C5F7A; border-color: #2C5F7A; color: #fff; }
 .btn-danger { background: #A5332A; border-color: #A5332A; }
 
-/* ===== Tablas ===== */
-.table { color: var(--ink); }
+/* ===== Tablas y Adaptabilidad ===== */
+.table { 
+    color: var(--ink); 
+    margin-bottom: 0;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius);
+}
+
+.table-responsive > .table {
+    width: 100%;
+    margin-bottom: 0;
+    max-width: none;
+}
+
+/* Evitar que las tablas se compriman en columnas microscópicas */
+.table-responsive table {
+    min-width: 620px;
+}
+
+.table-responsive table.table-sm {
+    min-width: 520px;
+}
+
+.calendar-table {
+    min-width: 720px;
+}
+
+.calendar-table th, .calendar-table td {
+    min-width: 90px;
+}
 
 .table thead th {
     font-size: 0.72rem;
@@ -307,6 +340,7 @@ a:hover { color: var(--mustard-dark); }
     color: var(--ink-soft);
     border-bottom: 1px solid var(--paper-line);
     font-weight: 600;
+    white-space: nowrap;
 }
 
 .table-hover tbody tr:hover {
@@ -316,6 +350,10 @@ a:hover { color: var(--mustard-dark); }
 .table td {
     border-color: #EFEAE0;
     vertical-align: middle;
+}
+
+.nowrap {
+    white-space: nowrap !important;
 }
 
 /* ===== Badges ===== */
@@ -518,5 +556,40 @@ a:hover { color: var(--mustard-dark); }
 
     .sidebar-overlay {
         display: block;
+    }
+
+    /* Wrap natural para filtros y botones en pantallas pequeñas */
+    .btn-group {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        width: 100%;
+    }
+
+    .btn-group > .btn {
+        flex: 1 1 auto;
+        border-radius: var(--radius) !important;
+        margin: 2px 0;
+    }
+
+    .stat-card {
+        padding: 0.9rem 1rem;
+    }
+
+    .stat-icon {
+        width: 42px;
+        height: 42px;
+        font-size: 1.2rem;
+    }
+
+    .stat-number {
+        font-size: 1.4rem;
+    }
+
+    .card-header {
+        padding: 0.85rem 1rem;
+    }
+
+    .card-body {
+        padding: 1rem;
     }
 }

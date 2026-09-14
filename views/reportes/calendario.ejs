@@ -23,31 +23,31 @@
 <div class="card mb-4">
     <div class="card-body py-3">
         <form method="GET" action="/reportes/calendario" class="row g-2 align-items-center">
-            <div class="col-auto">
-                <label class="form-label small mb-0">Mes</label>
+            <div class="col-6 col-sm-auto">
+                <label class="form-label small mb-1">Mes</label>
                 <select name="mes" class="form-select form-select-sm">
                     <% meses.forEach(m => { %>
                     <option value="<%= m.num %>" <%= m.num === mes ? 'selected' : '' %>><%= m.nombre %></option>
                     <% }) %>
                 </select>
             </div>
-            <div class="col-auto">
-                <label class="form-label small mb-0">Año</label>
-                <input type="number" name="anio" class="form-control form-control-sm" value="<%= anio %>" style="width:90px;">
+            <div class="col-6 col-sm-auto">
+                <label class="form-label small mb-1">Año</label>
+                <input type="number" name="anio" class="form-control form-control-sm" value="<%= anio %>" style="max-width:110px;">
             </div>
             <% if (current_user.rol !== 'alumno') { %>
-            <div class="col-auto">
-                <label class="form-label small mb-0">Curso</label>
+            <div class="col-12 col-sm-auto">
+                <label class="form-label small mb-1">Curso</label>
                 <select name="curso_id" class="form-select form-select-sm">
-                    <option value="">Todos</option>
+                    <option value="">Todos los cursos</option>
                     <% cursos.forEach(c => { %>
                     <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %></option>
                     <% }) %>
                 </select>
             </div>
             <% } %>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Ir</button>
+            <div class="col-12 col-sm-auto mt-2 mt-sm-auto pt-sm-3">
+                <button type="submit" class="btn btn-primary btn-sm w-100 w-sm-auto"><i class="bi bi-search"></i> Ir al mes</button>
             </div>
         </form>
     </div>
@@ -55,6 +55,9 @@
 
 <div class="card">
     <div class="card-body">
+        <div class="d-block d-md-none text-muted small mb-2">
+            <i class="bi bi-arrow-left-right me-1 text-primary"></i>Desliza hacia los lados para ver los 7 días
+        </div>
         <div class="table-responsive">
             <table class="table table-bordered text-center calendar-table mb-0">
                 <thead>

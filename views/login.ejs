@@ -73,13 +73,20 @@
                 </form>
 
                 <div class="demo-accesos">
-                    <span class="demo-titulo">Perfiles de prueba rápida (clic para autocompletar):</span>
+                    <span class="demo-titulo">Perfiles de prueba rápida (clic para entrar directamente):</span>
                     <div class="demo-botones">
-                        <button type="button" class="btn-demo" data-correo="utp@liceorbl.cl" data-clave="utp123">UTP</button>
-                        <button type="button" class="btn-demo" data-correo="carolina.reyes@liceosofofa.cl" data-clave="profe123">Profesor</button>
-                        <button type="button" class="btn-demo" data-correo="inspe.diaz@liceorbl.cl" data-clave="inspe123">Inspectoría</button>
-                        <button type="button" class="btn-demo" data-correo="joaquin.rivas@liceorbl.cl" data-clave="alumno123">Alumno</button>
+                        <button type="button" class="btn-demo" data-correo="utp@liceorbl.cl" data-clave="utp123" data-rol="utp">UTP</button>
+                        <button type="button" class="btn-demo" data-correo="carolina.reyes@liceosofofa.cl" data-clave="profe123" data-rol="profe">Profesor</button>
+                        <button type="button" class="btn-demo" data-correo="inspe.diaz@liceorbl.cl" data-clave="inspe123" data-rol="inspe">Inspectoría</button>
+                        <button type="button" class="btn-demo" data-correo="joaquin.rivas@liceorbl.cl" data-clave="alumno123" data-rol="alumno">Alumno</button>
                     </div>
+                </div>
+
+                <div id="avisoIframe" style="display: none; margin-top: 14px; padding: 10px 12px; background: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); border-radius: 8px; font-size: 13px; color: #1e3a8a; text-align: center;">
+                    <span>¿Tu navegador bloquea cookies en la vista previa?</span><br>
+                    <a href="/" target="_blank" style="color: #2563eb; font-weight: 600; text-decoration: underline; display: inline-block; margin-top: 4px;">
+                        Abrir aplicación en pestaña nueva ↗
+                    </a>
                 </div>
 
                 <p class="pie-registro">Plataforma de gestión académica · Liceo Industrial RBL</p>
@@ -96,12 +103,24 @@
         const campoPassword = document.getElementById('password');
         const avisoError = document.querySelector('.aviso-danger');
         const demoBotones = document.querySelectorAll('.btn-demo');
+        const avisoIframe = document.getElementById('avisoIframe');
+
+        // Detectar si está ejecutándose dentro de un iframe (como la vista previa de AI Studio)
+        try {
+            if (window.self !== window.top && avisoIframe) {
+                avisoIframe.style.display = 'block';
+            }
+        } catch (e) {
+            if (avisoIframe) avisoIframe.style.display = 'block';
+        }
 
         demoBotones.forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
                 campoCorreo.value = btn.dataset.correo;
                 campoPassword.value = btn.dataset.clave;
-                campoCorreo.focus();
+                boton.classList.add('loading');
+                formulario.submit();
             });
         });
 

@@ -13,11 +13,11 @@
 
 <div class="card mb-4">
     <div class="card-body py-3">
-        <div class="btn-group" role="group">
-            <a href="/recuperaciones" class="btn btn-sm {{ !filtros.estado ? 'btn-primary' : 'btn-outline-primary' }}">Todas</a>
-            <a href="/recuperaciones?estado=pendiente" class="btn btn-sm {{ filtros.estado === 'pendiente' ? 'btn-warning' : 'btn-outline-warning' }}">Pendientes</a>
-            <a href="/recuperaciones?estado=completada" class="btn btn-sm {{ filtros.estado === 'completada' ? 'btn-success' : 'btn-outline-success' }}">Completadas</a>
-            <a href="/recuperaciones?estado=cancelada" class="btn btn-sm {{ filtros.estado === 'cancelada' ? 'btn-secondary' : 'btn-outline-secondary' }}">Canceladas</a>
+        <div class="d-flex flex-wrap gap-2" role="group">
+            <a href="/recuperaciones" class="btn btn-sm {% if not filtros.estado %}btn-primary{% else %}btn-outline-primary{% endif %}">Todas</a>
+            <a href="/recuperaciones?estado=pendiente" class="btn btn-sm {% if filtros.estado == 'pendiente' %}btn-warning{% else %}btn-outline-warning{% endif %}">Pendientes</a>
+            <a href="/recuperaciones?estado=completada" class="btn btn-sm {% if filtros.estado == 'completada' %}btn-success{% else %}btn-outline-success{% endif %}">Completadas</a>
+            <a href="/recuperaciones?estado=cancelada" class="btn btn-sm {% if filtros.estado == 'cancelada' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Canceladas</a>
         </div>
     </div>
 </div>
@@ -25,18 +25,19 @@
 <div class="card">
     <div class="card-body p-0">
         {% if recuperaciones|length > 0 %}
-        <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
+        <!-- Vista de tabla para PC, Laptop y Tablets -->
+        <div class="table-responsive d-none d-md-block">
+            <table class="table table-hover mb-0 align-middle" style="min-width: 720px;">
                 <thead class="table-light">
                     <tr>
-                        <th>Alumno</th>
-                        <th>Evaluación original</th>
-                        <th>Fecha original</th>
-                        <th>Fecha recuperación</th>
-                        <th>Exigencia</th>
-                        <th>Motivo</th>
-                        <th>Estado</th>
-                        <th class="text-end">Acciones</th>
+                        <th style="min-width: 140px;">Alumno</th>
+                        <th style="min-width: 150px;">Evaluación original</th>
+                        <th class="nowrap">Fecha original</th>
+                        <th class="nowrap">Fecha recup.</th>
+                        <th class="nowrap">Exigencia</th>
+                        <th style="min-width: 120px;">Motivo</th>
+                        <th class="nowrap">Estado</th>
+                        <th class="text-end nowrap">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -44,38 +45,38 @@
                     <tr>
                         <td>
                             <a href="/alumnos/{{ rec.alumno_id }}" class="text-decoration-none fw-semibold">
-                                {{ rec.alumno ? rec.alumno.nombre_completo : 'Alumno' }}
+                                {{ rec.alumno.nombre_completo if rec.alumno else 'Alumno' }}
                             </a>
-                            <br><small class="text-muted">{{ (rec.alumno && rec.alumno.curso) ? rec.alumno.curso.nombre : '' }}</small>
+                            <br><small class="text-muted">{{ rec.alumno.curso.nombre if (rec.alumno and rec.alumno.curso) else '' }}</small>
                         </td>
                         <td>
                             <a href="/evaluaciones/{{ rec.evaluacion_id }}" class="text-decoration-none">
-                                {{ rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' }}
+                                {{ rec.evaluacion.titulo if rec.evaluacion else 'Evaluación' }}
                             </a>
                         </td>
-                        <td>{{ rec.evaluacion ? rec.evaluacion.fecha : '-' }}</td>
-                        <td>
+                        <td class="nowrap">{{ rec.evaluacion.fecha if rec.evaluacion else '-' }}</td>
+                        <td class="nowrap">
                             <span class="fw-semibold">{{ rec.fecha_recuperacion }}</span>
                         </td>
-                        <td>
-                            {% if Number(rec.porcentaje_exigencia) >= 70 %}
-                            <span class="badge bg-danger" title="Sin justificar (70%)">{{ Math.round(rec.porcentaje_exigencia) }}%</span>
+                        <td class="nowrap">
+                            {% if rec.porcentaje_exigencia|float >= 70 %}
+                            <span class="badge bg-danger" title="Sin justificar (70%)">{{ rec.porcentaje_exigencia|round|int }}%</span>
                             {% else %}
-                            <span class="badge bg-success" title="Justificada (60%)">{{ Math.round(rec.porcentaje_exigencia) }}%</span>
+                            <span class="badge bg-success" title="Justificada (60%)">{{ rec.porcentaje_exigencia|round|int }}%</span>
                             {% endif %}
                         </td>
-                        <td class="text-muted small">{{ rec.motivo || '-' }}</td>
-                        <td>
-                            {% if rec.estado === 'pendiente' %}
+                        <td class="text-muted small">{{ rec.motivo or '-' }}</td>
+                        <td class="nowrap">
+                            {% if rec.estado == 'pendiente' %}
                             <span class="badge bg-warning text-dark">Pendiente</span>
-                            {% elif rec.estado === 'completada' %}
+                            {% elif rec.estado == 'completada' %}
                             <span class="badge bg-success">Completada</span>
                             {% else %}
                             <span class="badge bg-secondary">Cancelada</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">
-                            {% if rec.estado === 'pendiente' && ['utp','profe','inspe'].includes(current_user.rol) %}
+                        <td class="text-end nowrap">
+                            {% if rec.estado == 'pendiente' and current_user.rol in ['utp','profe','inspe'] %}
                             <form method="POST" action="/recuperaciones/{{ rec.id }}/completar" class="d-inline">
                                 <button type="submit" class="btn btn-sm btn-success" title="Marcar completada"><i class="bi bi-check-lg"></i></button>
                             </form>
@@ -85,9 +86,65 @@
                             {% endif %}
                         </td>
                     </tr>
-                    <% }) %>
+                    {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Vista de tarjetas móviles (wrap natural) para Celulares -->
+        <div class="d-md-none p-3">
+            <div class="row g-3">
+                {% for rec in recuperaciones %}
+                <div class="col-12">
+                    <div class="p-3 bg-light rounded border">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div>
+                                <a href="/alumnos/{{ rec.alumno_id }}" class="fw-bold text-decoration-none">
+                                    {{ rec.alumno.nombre_completo if rec.alumno else 'Alumno' }}
+                                </a>
+                                <div class="small text-muted">{{ rec.alumno.curso.nombre if (rec.alumno and rec.alumno.curso) else '' }}</div>
+                            </div>
+                            {% if rec.estado == 'pendiente' %}
+                            <span class="badge bg-warning text-dark">Pendiente</span>
+                            {% elif rec.estado == 'completada' %}
+                            <span class="badge bg-success">Completada</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Cancelada</span>
+                            {% endif %}
+                        </div>
+                        <div class="small mb-1">
+                            <span class="text-muted">Evaluación:</span>
+                            <a href="/evaluaciones/{{ rec.evaluacion_id }}" class="text-decoration-none fw-semibold">
+                                {{ rec.evaluacion.titulo if rec.evaluacion else 'Evaluación' }}
+                            </a>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 align-items-center small my-2">
+                            <span class="badge bg-light text-dark border">
+                                <i class="bi bi-calendar-check me-1"></i>Recup: {{ rec.fecha_recuperacion }}
+                            </span>
+                            <span class="badge {% if rec.porcentaje_exigencia|float >= 70 %}bg-danger{% else %}bg-success{% endif %}">
+                                {{ rec.porcentaje_exigencia|round|int }}% Exigencia
+                            </span>
+                        </div>
+                        {% if rec.motivo %}
+                        <div class="small text-muted fst-italic mb-2">
+                            {{ rec.motivo }}
+                        </div>
+                        {% endif %}
+                        {% if rec.estado == 'pendiente' and current_user.rol in ['utp','profe','inspe'] %}
+                        <div class="d-flex gap-2 mt-2 pt-2 border-top">
+                            <form method="POST" action="/recuperaciones/{{ rec.id }}/completar" class="flex-grow-1">
+                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-check-lg me-1"></i>Completar</button>
+                            </form>
+                            <form method="POST" action="/recuperaciones/{{ rec.id }}/cancelar" onsubmit="return confirm('¿Cancelar esta recuperación?')">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Cancelar"><i class="bi bi-x-lg"></i></button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
         {% else %}
         <div class="text-center py-5 text-muted">

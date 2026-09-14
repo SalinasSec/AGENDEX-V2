@@ -10,19 +10,69 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
+// Trust reverse proxy (Google Cloud Run / Nginx / AI Studio)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'agendex-liceo-secret-2024',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 }
-  })
-);
+// Intercept Set-Cookie header to append ; Partitioned on HTTPS (CHIPS standard for iframes)
+app.use((req, res, next) => {
+  const prevSetHeader = res.setHeader;
+  res.setHeader = function (name, value) {
+    if (typeof name === 'string' && name.toLowerCase() === 'set-cookie') {
+      const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+      if (isHttps) {
+        if (Array.isArray(value)) {
+          value = value.map(cookie => {
+            if (typeof cookie === 'string' && cookie.includes('SameSite=None') && !cookie.includes('Partitioned')) {
+              return `${cookie}; Partitioned`;
+            }
+            return cookie;
+          });
+        } else if (typeof value === 'string' && value.includes('SameSite=None') && !value.includes('Partitioned')) {
+          value = `${value}; Partitioned`;
+        }
+      }
+    }
+    return prevSetHeader.apply(this, arguments);
+  };
+  next();
+});
+
+// Configure session with explicit MemoryStore to persist across requests
+const sessionStore = new session.MemoryStore();
+
+const sessionMiddleware = session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET || 'agendex-liceo-secret-2024',
+  resave: false,
+  saveUninitialized: false,
+  proxy: true,
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true
+  }
+});
+
+app.use(sessionMiddleware);
+
+// Dynamically adjust cookie security for HTTPS / iframes vs localhost HTTP
+app.use((req, res, next) => {
+  if (req.session && req.session.cookie) {
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    if (isHttps) {
+      req.session.cookie.secure = true;
+      req.session.cookie.sameSite = 'none';
+    } else {
+      req.session.cookie.secure = false;
+      req.session.cookie.sameSite = 'lax';
+    }
+  }
+  next();
+});
 
 // View engine
 app.set('views', path.join(__dirname, 'views'));
@@ -129,12 +179,46 @@ const handleLogin = (req, res) => {
   };
 
   req.flash('success', `¡Bienvenido(a) de nuevo, ${user.nombre}!`);
-  res.redirect('/');
+  req.session.save((err) => {
+    if (err) {
+      console.error('Error guardando sesión:', err);
+    }
+    res.redirect('/');
+  });
 };
 
 const handleLogout = (req, res) => {
-  req.session.destroy(() => {
+  req.session.destroy((err) => {
+    res.clearCookie('connect.sid');
     res.redirect('/login');
+  });
+};
+
+const handleDemoLogin = (req, res) => {
+  const { rol } = req.params;
+  let correo = 'inspe.diaz@liceorbl.cl';
+  if (rol === 'utp') correo = 'utp@liceorbl.cl';
+  else if (rol === 'profe' || rol === 'profesor') correo = 'carolina.reyes@liceosofofa.cl';
+  else if (rol === 'inspe' || rol === 'inspectoria') correo = 'inspe.diaz@liceorbl.cl';
+  else if (rol === 'alumno') correo = 'joaquin.rivas@liceorbl.cl';
+
+  const user = store.getUsuarioByCorreo(correo);
+  if (!user) {
+    return res.redirect('/login');
+  }
+
+  req.session.user = {
+    rut: user.rut,
+    correo: user.correo,
+    nombre: user.nombre,
+    rol: user.rol,
+    profesor_id: user.profesor_id || null,
+    alumno_id: user.alumno_id || null
+  };
+
+  req.flash('success', `Acceso rápido de prueba iniciado como ${user.nombre} (${user.rol.toUpperCase()})`);
+  req.session.save((err) => {
+    res.redirect('/');
   });
 };
 
@@ -142,6 +226,7 @@ app.get('/login', renderLogin);
 app.get('/auth/login', renderLogin);
 app.post('/login', handleLogin);
 app.post('/auth/login', handleLogin);
+app.get('/auth/demo/:rol', handleDemoLogin);
 app.all('/logout', handleLogout);
 app.all('/auth/logout', handleLogout);
 
