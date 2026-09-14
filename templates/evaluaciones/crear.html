@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="bi bi-plus-circle me-2"></i>Crear Nueva Evaluación</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/evaluaciones/crear" id="formEvaluacion">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Título <span class="text-danger">*</span></label>
+                            <input type="text" name="titulo" class="form-control" required placeholder="Ej: Prueba N°1 Álgebra" maxlength="150">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha <span class="text-danger">*</span></label>
+                            <input type="date" name="fecha" id="fechaInput" class="form-control" required min="{{ hoy }}" value="{{ hoy }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Hora</label>
+                            <input type="time" name="hora" class="form-control" value="08:30">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Curso <span class="text-danger">*</span></label>
+                            <select name="curso_id" id="cursoInput" class="form-select" required>
+                                <option value="">Seleccionar curso...</option>
+                                {% for c in cursos %}
+                                <option value="{{ c.id }}">{{ c.nombre }} ({{ c.nivel }})</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Asignatura <span class="text-danger">*</span></label>
+                            <select name="asignatura_id" class="form-select" required>
+                                <option value="">Seleccionar asignatura...</option>
+                                {% for a in asignaturas %}
+                                <option value="{{ a.id }}">{{ a.nombre }}</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Profesor</label>
+                            <input type="text" class="form-control" value="{{ mi_profesor.nombre_completo }}" disabled>
+                            <div class="form-text">La evaluación queda registrada a tu nombre.</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Descripción</label>
+                            <textarea name="descripcion" class="form-control" rows="3" placeholder="Descripción opcional de contenidos..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Disponibilidad check con regla máx 2 evaluaciones por curso por día -->
+                    <div id="disponibilidad" class="alert mt-3" style="display:none;"></div>
+
+                    <hr>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="/evaluaciones" class="btn btn-outline-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-primary" id="btnSubmit">
+                            <i class="bi bi-check-lg me-1"></i>Crear Evaluación
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer', {
+    scripts: `
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fechaInput = document.getElementById('fechaInput');
+    const cursoInput = document.getElementById('cursoInput');
+    const disponibilidad = document.getElementById('disponibilidad');
+    const btnSubmit = document.getElementById('btnSubmit');
+
+    async function checkDisponibilidad() {
+        const fecha = fechaInput.value;
+        const cursoId = cursoInput.value;
+        if (!fecha || !cursoId) {
+            disponibilidad.style.display = 'none';
+            return;
+        }
+        try {
+            const resp = await fetch('/evaluaciones/api/disponibilidad?curso_id=' + cursoId + '&fecha=' + fecha);
+            const data = await resp.json();
+            if (data.disponibles <= 0) {
+                disponibilidad.className = 'alert alert-danger mt-3';
+                disponibilidad.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Límite alcanzado.</strong> Ya existen 2 evaluaciones para este curso en esta fecha (regla máxima de 2 por día).';
+                disponibilidad.style.display = 'block';
+                btnSubmit.disabled = true;
+            } else {
+                disponibilidad.className = 'alert alert-success mt-3';
+                let html = '<i class="bi bi-check-circle-fill me-2"></i><strong>Hay lugar disponible.</strong> ' + data.disponibles + ' espacio(s) disponible(s) para este curso en esta fecha.';
+                if (data.evaluaciones && data.evaluaciones|length > 0) {
+                    html += '<br><small class="text-muted">Evaluaciones existentes: ' + data.evaluaciones.map(e => e.titulo).join(', ') + '</small>';
+                }
+                disponibilidad.innerHTML = html;
+                disponibilidad.style.display = 'block';
+                btnSubmit.disabled = false;
+            }
+        } catch(e) {
+            disponibilidad.style.display = 'none';
+        }
+    }
+
+    fechaInput.addEventListener('change', checkDisponibilidad);
+    cursoInput.addEventListener('change', checkDisponibilidad);
+    if (cursoInput.value) checkDisponibilidad();
+});
+</script>
+`
+}) %>
+
+{% endblock %}

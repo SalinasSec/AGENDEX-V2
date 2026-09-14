@@ -17,7 +17,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(
   session({
-    secret: 'agendex-liceo-secret-2024',
+    secret: process.env.SESSION_SECRET || 'agendex-liceo-secret-2024',
     resave: false,
     saveUninitialized: false,
     cookie: { maxAge: 24 * 60 * 60 * 1000 }

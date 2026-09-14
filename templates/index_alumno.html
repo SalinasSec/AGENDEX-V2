@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    Bienvenido, <strong>{{ current_user.nombre }}</strong>. Desde aquí puedes consultar tus evaluaciones y recuperaciones.
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#E9E2D1;color:#14213D;"><i class="bi bi-clipboard-check"></i></div>
+            <div>
+                <div class="stat-number">{{ stats.total_evaluaciones }}</div>
+                <div class="stat-label">Evaluaciones de mi curso</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#F6E7CB;color:#A87F2C;"><i class="bi bi-calendar-check"></i></div>
+            <div>
+                <div class="stat-number">{{ stats.evals_semana }}</div>
+                <div class="stat-label">Próximos 7 días</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#F6E3DE;color:#A5332A;"><i class="bi bi-hourglass-split"></i></div>
+            <div>
+                <div class="stat-number">{{ stats.recuperaciones_pendientes }}</div>
+                <div class="stat-label">Mis recuperaciones pendientes</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-calendar3 text-warning me-2"></i>Mis Evaluaciones</h5>
+            </div>
+            <div class="card-body">
+                {% if mis_evals|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead>
+                            <tr><th>Fecha</th><th>Evaluación</th><th>Asignatura</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in mis_evals %}
+                            <tr>
+                                <td>
+                                    <span>{{ ev.fecha }}</span>
+                                    {% if ev.fecha === today %}<span class="badge bg-success ms-1">Hoy</span>{% endif %}
+                                </td>
+                                <td><strong>{{ ev.titulo }}</strong></td>
+                                <td><span class="badge" style="background:{{ ev.asignatura.color }};">{{ ev.asignatura.nombre }}</span></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-x display-4"></i>
+                    <p class="mt-2 mb-0">No hay evaluaciones registradas para tu curso aún.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise text-warning me-2"></i>Mis Recuperaciones</h5>
+            </div>
+            <div class="card-body">
+                {% if mis_recuperaciones|length > 0 %}
+                <div class="list-group list-group-flush mb-3">
+                    {% for rec in mis_recuperaciones %}
+                    <div class="list-group-item px-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong class="small">{{ rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' }}</strong>
+                                <br><small class="text-muted">Fecha: {{ rec.fecha_recuperacion }}</small>
+                                <br><small class="text-info">Exigencia: {{ rec.porcentaje_exigencia }}%</small>
+                            </div>
+                            {% if rec.estado === 'pendiente' %}
+                            <span class="badge bg-warning text-dark">Pendiente</span>
+                            {% elif rec.estado === 'completada' %}
+                            <span class="badge bg-success">Completada</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Cancelada</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <% }) %>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-check-circle display-4 text-success"></i>
+                    <p class="mt-2 mb-0">No tienes recuperaciones asignadas.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{% endblock %}

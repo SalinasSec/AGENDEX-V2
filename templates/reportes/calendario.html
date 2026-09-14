@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h4 class="mb-0"><i class="bi bi-calendar3 me-2 text-primary"></i>Calendario de Evaluaciones</h4>
+    <div class="d-flex gap-2 align-items-center">
+        <% 
+            const prevMes = mes > 1 ? mes - 1 : 12;
+            const prevAnio = mes > 1 ? anio : anio - 1;
+            const nextMes = mes < 12 ? mes + 1 : 1;
+            const nextAnio = mes < 12 ? anio : anio + 1;
+        %>
+        <a href="/reportes/calendario?mes={{ prevMes }}&anio={{ prevAnio }}&curso_id={{ filtros.curso_id || '' }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+        <span class="fw-bold fs-5">{{ mes_nombre }} {{ anio }}</span>
+        <a href="/reportes/calendario?mes={{ nextMes }}&anio={{ nextAnio }}&curso_id={{ filtros.curso_id || '' }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+        <a href="/reportes/calendario" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-calendar2-week me-1"></i>Hoy</a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="GET" action="/reportes/calendario" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label class="form-label small mb-0">Mes</label>
+                <select name="mes" class="form-select form-select-sm">
+                    {% for m in meses %}
+                    <option value="{{ m.num }}" {{ m.num === mes ? 'selected' : '' }}>{{ m.nombre }}</option>
+                    <% }) %>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label small mb-0">Año</label>
+                <input type="number" name="anio" class="form-control form-control-sm" value="{{ anio }}" style="width:90px;">
+            </div>
+            {% if current_user.rol !== 'alumno' %}
+            <div class="col-auto">
+                <label class="form-label small mb-0">Curso</label>
+                <select name="curso_id" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    {% for c in cursos %}
+                    <option value="{{ c.id }}" {{ filtros.curso_id == c.id ? 'selected' : '' }}>{{ c.nombre }}</option>
+                    <% }) %>
+                </select>
+            </div>
+            {% endif %}
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Ir</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered text-center calendar-table mb-0">
+                <thead>
+                    <tr class="table-light">
+                        <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for semana in semanas %}
+                    <tr>
+                        {% for dia in semana %}
+                            {% if dia === 0 %}
+                            <td class="text-muted bg-light" style="height:110px;width:14%;"></td>
+                            {% else %}
+                            <td class="align-top {{ (dia === today_day && anio === today_year && mes === today_month) ? 'today-cell' : '' }}" style="height:110px;width:14%;">
+                                <span class="fw-bold {{ (dia === today_day && anio === today_year && mes === today_month) ? 'text-primary' : '' }}">{{ dia }}</span>
+                                {% if evals_por_dia[dia] && evals_por_dia[dia]|length > 0 %}
+                                <div class="mt-1 d-flex flex-column gap-1">
+                                    <% evals_por_dia[dia].forEach(ev => { %>
+                                    <a href="/evaluaciones/{{ ev.id }}" class="text-start text-decoration-none calendar-event text-white small p-1 rounded d-block" style="background:{{ ev.asignatura ? ev.asignatura.color : '#0d6efd' }};">
+                                        <div class="fw-semibold text-truncate">{{ ev.titulo }}</div>
+                                        <span class="opacity-75" style="font-size:0.7rem;">{{ ev.curso ? ev.curso.nombre : '' }} &bull; {{ ev.hora || '' }}</span>
+                                    </a>
+                                    <% }) %>
+                                </div>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        <% }) %>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+
+{% endblock %}

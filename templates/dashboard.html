@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+<div class="row g-3 mb-4">
+    <!-- Stat 1: Evaluaciones hoy -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#FBF5E6; color:var(--mustard);">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div>
+                <div class="stat-number">{{ evals_hoy|length }}</div>
+                <div class="stat-label">Evaluaciones Hoy</div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 2: Esta semana -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#EFF5F8; color:#2C5F7A;">
+                <i class="bi bi-calendar3"></i>
+            </div>
+            <div>
+                <div class="stat-number">{{ evals_semana|length }}</div>
+                <div class="stat-label">Esta Semana</div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 3: Recuperaciones pendientes -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#FBF0EE; color:#A5332A;">
+                <i class="bi bi-arrow-counterclockwise"></i>
+            </div>
+            <div>
+                <div class="stat-number">{{ recuperaciones_pendientes|length }}</div>
+                <div class="stat-label">Recuperaciones Pendientes</div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 4: Total cursos -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#EFF6F1; color:#2F6F4E;">
+                <i class="bi bi-mortarboard"></i>
+            </div>
+            <div>
+                <div class="stat-number">{{ total_cursos }}</div>
+                <div class="stat-label">Cursos Registrados</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Evaluaciones de hoy -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-bell text-warning me-2"></i>Evaluaciones Programadas para Hoy</h5>
+                {% if current_user.rol === 'profe' %}
+                <a href="/evaluaciones/crear" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Nueva Evaluación
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if evals_hoy|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>Curso</th>
+                                <th>Asignatura</th>
+                                <th>Título</th>
+                                <th>Profesor</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in evals_hoy %}
+                            <tr>
+                                <td><span class="badge bg-light text-dark border">{{ ev.hora || '--:--' }}</span></td>
+                                <td><strong>{{ ev.curso.nombre }}</strong></td>
+                                <td>
+                                    <span class="badge" style="background-color: {{ ev.asignatura.color }};">
+                                        {{ ev.asignatura.nombre }}
+                                    </span>
+                                </td>
+                                <td>{{ ev.titulo }}</td>
+                                <td>{{ ev.profesor.nombre_completo }}</td>
+                                <td class="text-end">
+                                    <a href="/evaluaciones/{{ ev.id }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Detalle
+                                    </a>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-check display-4 text-success"></i>
+                    <p class="mt-2 mb-0">No hay evaluaciones programadas para el día de hoy.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fila inferior: Próximas, Distribución y Recuperaciones -->
+<div class="row g-4">
+    <!-- Próximas de la semana -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="bi bi-calendar-week text-primary me-2"></i>Esta Semana</h5>
+            </div>
+            <div class="card-body">
+                {% if evals_semana|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Evaluación</th>
+                                <th>Curso</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in evals_semana %}
+                            <tr>
+                                <td><small class="text-muted">{{ ev.fecha }}</small></td>
+                                <td class="text-truncate" style="max-width: 140px;">{{ ev.titulo }}</td>
+                                <td><span class="badge bg-light text-dark border">{{ ev.curso.nombre }}</span></td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-x display-5"></i>
+                    <p class="mt-2 mb-0">No hay más evaluaciones esta semana.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Evaluaciones por curso -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="bi bi-bar-chart text-info me-2"></i>Carga por Curso</h5>
+            </div>
+            <div class="card-body">
+                {% if evals_por_curso|length > 0 %}
+                <% const maxEvals = Math.max(...evals_por_curso.map(x => x.count), 1); %>
+                <% evals_por_curso.slice(0, 6).forEach(item => { %>
+                <div class="d-flex align-items-center mb-3">
+                    <span style="width: 80px;" class="small fw-semibold">{{ item.curso_nombre }}</span>
+                    <div class="progress flex-grow-1 mx-2" style="height: 18px; border-radius: 4px;">
+                        <div class="progress-bar bg-info" style="width: {{ Math.round((item.count / maxEvals) * 100) }}%;">
+                            {{ item.count }}
+                        </div>
+                    </div>
+                </div>
+                <% }) %>
+                {% else %}
+                <p class="text-muted text-center py-4">Sin evaluaciones registradas</p>
+                
+            </div>
+        </div>
+    </div>
+
+    <!-- Recuperaciones pendientes -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise text-danger me-2"></i>Pendientes</h5>
+                <span class="badge bg-danger">{{ recuperaciones_pendientes|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if recuperaciones_pendientes|length > 0 %}
+                <div class="list-group list-group-flush mb-3">
+                    <% recuperaciones_pendientes.slice(0, 4).forEach(rec => { %>
+                    <div class="list-group-item px-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong class="small">{{ rec.alumno ? rec.alumno.nombre_completo : 'Alumno' }}</strong>
+                                <br><small class="text-muted">{{ rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' }}</small>
+                            </div>
+                            <span class="badge bg-warning text-dark">{{ rec.fecha_recuperacion }}</span>
+                        </div>
+                    </div>
+                    <% }) %>
+                </div>
+                <div class="text-center">
+                    <a href="/recuperaciones" class="btn btn-sm btn-outline-danger">Ver todas</a>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-check-circle display-5 text-success"></i>
+                    <p class="mt-2 mb-0">No hay recuperaciones pendientes.</p>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{% endblock %}

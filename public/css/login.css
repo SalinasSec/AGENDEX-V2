@@ -223,60 +223,99 @@ img, svg, video, canvas {
     transform: translateY(4px);
 }
 
-/* ---------- Campos con línea inferior ---------- */
+/* ---------- Campos de formulario estructurados ---------- */
 .formulario {
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: 20px;
 }
 
 .campo {
-    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    text-align: left;
 }
 
-.campo input {
+.campo-etiqueta {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--navy);
+    letter-spacing: 0.01em;
+}
+
+.campo-input {
     width: 100%;
-    border: none;
-    border-bottom: 1.5px solid var(--paper-line);
-    background: transparent;
-    padding: 10px 2px 10px;
+    border: 1.5px solid var(--paper-line);
+    border-radius: 6px;
+    background: #FFFFFF;
+    padding: 12px 14px;
     font-size: 15px;
     line-height: 1.4;
     font-family: 'Inter', sans-serif;
     color: var(--ink);
     outline: none;
-    box-shadow: inset 0 -1.5px 0 transparent,
-                0 4px 10px -6px rgba(200, 155, 60, 0);
-    transition: box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-                border-bottom-color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
-.campo input:focus {
-    border-bottom-color: var(--mustard);
-    box-shadow: inset 0 -1.5px 0 var(--mustard),
-                0 0 0 3px rgba(200, 155, 60, 0.18);
+.campo-input::placeholder {
+    color: #9AA5B5;
+    font-weight: 400;
+    font-size: 14px;
 }
 
-.campo input:focus-visible {
-    border-radius: 3px;
+.campo-input:focus {
+    border-color: var(--navy);
+    box-shadow: 0 0 0 3px rgba(20, 33, 61, 0.12);
+    background: #FFFFFF;
 }
 
-.campo label {
-    position: absolute;
-    left: 2px;
-    top: 10px;
-    font-size: 15px;
-    color: var(--ink-soft);
-    pointer-events: none;
-    transition: 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+/* ---------- Accesos rápidos de demostración ---------- */
+.demo-accesos {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px dashed var(--paper-line);
+    text-align: center;
 }
 
-.campo input:focus + label,
-.campo input:not(:placeholder-shown) + label {
-    top: -16px;
+.demo-titulo {
+    display: block;
     font-size: 11.5px;
-    letter-spacing: 0.02em;
-    color: var(--mustard-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.demo-botones {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-demo {
+    background: #F4EFE4;
+    border: 1px solid var(--paper-line);
+    border-radius: 16px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    color: var(--navy);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.btn-demo:hover {
+    background: #EAE3D2;
+    border-color: #D3C7AE;
+    transform: translateY(-1px);
+}
+
+.btn-demo:active {
+    transform: translateY(0);
 }
 
 /* ---------- Botón ---------- */

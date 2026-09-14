@@ -37,28 +37,30 @@
         <section class="panel-formulario">
             <div class="formulario-envoltorio">
 
-                <% if (typeof error !== 'undefined' && error) { %>
+                {% if error %}
                     <div class="aviso aviso-danger">
-                        <%= error %>
+                        {{ error }}
                     </div>
-                <% } %>
-                <% if (typeof messages !== 'undefined' && messages && messages.length > 0) { %>
-                    <% messages.forEach(msg => { %>
-                    <div class="aviso aviso-<%= msg.category === 'error' ? 'danger' : msg.category %>">
-                        <%= msg.message %>
-                    </div>
-                    <% }) %>
-                <% } %>
+                {% endif %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="aviso aviso-{{ 'danger' if category == 'error' else category }}">
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
 
                 <header class="formulario-encabezado">
                     <h1>Inicia sesión</h1>
                     <p class="rol-frase">Ingresa tus credenciales institucionales para acceder.</p>
                 </header>
 
-                <form class="formulario" method="POST" action="/auth/login">
+                <form class="formulario" method="POST" action="/login">
                     <div class="campo">
                         <label for="correo" class="campo-etiqueta">Correo institucional</label>
-                        <input type="email" id="correo" name="correo" class="campo-input" value="<%= typeof correo !== 'undefined' ? correo : '' %>" placeholder="ejemplo@liceorbl.cl" required autocomplete="username" autofocus>
+                        <input type="email" id="correo" name="correo" class="campo-input" value="{{ correo or '' }}" placeholder="ejemplo@liceorbl.cl" required autocomplete="username" autofocus>
                     </div>
 
                     <div class="campo">

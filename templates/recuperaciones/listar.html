@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h4 class="mb-0"><i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Recuperaciones</h4>
+    {% if ['utp','profe','inspe'].includes(current_user.rol) %}
+    <a href="/recuperaciones/crear" class="btn btn-warning">
+        <i class="bi bi-plus-circle me-1"></i>Nueva Recuperación
+    </a>
+    {% endif %}
+</div>
+
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <div class="btn-group" role="group">
+            <a href="/recuperaciones" class="btn btn-sm {{ !filtros.estado ? 'btn-primary' : 'btn-outline-primary' }}">Todas</a>
+            <a href="/recuperaciones?estado=pendiente" class="btn btn-sm {{ filtros.estado === 'pendiente' ? 'btn-warning' : 'btn-outline-warning' }}">Pendientes</a>
+            <a href="/recuperaciones?estado=completada" class="btn btn-sm {{ filtros.estado === 'completada' ? 'btn-success' : 'btn-outline-success' }}">Completadas</a>
+            <a href="/recuperaciones?estado=cancelada" class="btn btn-sm {{ filtros.estado === 'cancelada' ? 'btn-secondary' : 'btn-outline-secondary' }}">Canceladas</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if recuperaciones|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Alumno</th>
+                        <th>Evaluación original</th>
+                        <th>Fecha original</th>
+                        <th>Fecha recuperación</th>
+                        <th>Exigencia</th>
+                        <th>Motivo</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rec in recuperaciones %}
+                    <tr>
+                        <td>
+                            <a href="/alumnos/{{ rec.alumno_id }}" class="text-decoration-none fw-semibold">
+                                {{ rec.alumno ? rec.alumno.nombre_completo : 'Alumno' }}
+                            </a>
+                            <br><small class="text-muted">{{ (rec.alumno && rec.alumno.curso) ? rec.alumno.curso.nombre : '' }}</small>
+                        </td>
+                        <td>
+                            <a href="/evaluaciones/{{ rec.evaluacion_id }}" class="text-decoration-none">
+                                {{ rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' }}
+                            </a>
+                        </td>
+                        <td>{{ rec.evaluacion ? rec.evaluacion.fecha : '-' }}</td>
+                        <td>
+                            <span class="fw-semibold">{{ rec.fecha_recuperacion }}</span>
+                        </td>
+                        <td>
+                            {% if Number(rec.porcentaje_exigencia) >= 70 %}
+                            <span class="badge bg-danger" title="Sin justificar (70%)">{{ Math.round(rec.porcentaje_exigencia) }}%</span>
+                            {% else %}
+                            <span class="badge bg-success" title="Justificada (60%)">{{ Math.round(rec.porcentaje_exigencia) }}%</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ rec.motivo || '-' }}</td>
+                        <td>
+                            {% if rec.estado === 'pendiente' %}
+                            <span class="badge bg-warning text-dark">Pendiente</span>
+                            {% elif rec.estado === 'completada' %}
+                            <span class="badge bg-success">Completada</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Cancelada</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if rec.estado === 'pendiente' && ['utp','profe','inspe'].includes(current_user.rol) %}
+                            <form method="POST" action="/recuperaciones/{{ rec.id }}/completar" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-success" title="Marcar completada"><i class="bi bi-check-lg"></i></button>
+                            </form>
+                            <form method="POST" action="/recuperaciones/{{ rec.id }}/cancelar" class="d-inline" onsubmit="return confirm('¿Cancelar esta recuperación?')">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Cancelar"><i class="bi bi-x-lg"></i></button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-check-circle display-1 text-success"></i>
+            <p class="mt-3">No hay recuperaciones en esta categoría.</p>
+            {% if ['utp','profe','inspe'].includes(current_user.rol) %}
+            <a href="/recuperaciones/crear" class="btn btn-warning"><i class="bi bi-plus-circle me-1"></i>Asignar nueva</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+
+
+{% endblock %}
