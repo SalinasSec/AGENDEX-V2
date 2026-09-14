@@ -1,0 +1,80 @@
+<%- include('../partials/header', { 
+    title: 'Evaluaciones Pendientes de Recuperación', 
+    active: 'pendientes',
+    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item"><a href="/reportes/calendario">Reportes</a></li><li class="breadcrumb-item active">Pendientes</li></ol></nav>'
+}) %>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h4 class="mb-0"><i class="bi bi-hourglass-split me-2 text-warning"></i>Alumnos Pendientes de Recuperación</h4>
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+</div>
+
+<% if (Object.keys(alumnos_por_eval).length > 0) { %>
+<div class="accordion" id="accordionPendientes">
+    <% Object.entries(alumnos_por_eval).forEach(([ev_id, recs], idx) => { %>
+    <% const ev = recs[0].evaluacion || { titulo: 'Evaluación', curso: {}, asignatura: {}, profesor: {} }; %>
+    <div class="accordion-item mb-2 border rounded">
+        <h2 class="accordion-header">
+            <button class="accordion-button <%= idx !== 0 ? 'collapsed' : '' %>" type="button" data-bs-toggle="collapse" data-bs-target="#collapse<%= ev_id %>">
+                <div class="d-flex justify-content-between w-100 pe-3 align-items-center">
+                    <span><i class="bi bi-clipboard-check me-2 text-primary"></i><strong><%= ev.titulo %></strong></span>
+                    <span class="badge bg-warning text-dark"><%= recs.length %> alumno(s)</span>
+                </div>
+            </button>
+        </h2>
+        <div id="collapse<%= ev_id %>" class="accordion-collapse collapse <%= idx === 0 ? 'show' : '' %>" data-bs-parent="#accordionPendientes">
+            <div class="accordion-body">
+                <div class="mb-3 small text-muted">
+                    <%= ev.curso ? ev.curso.nombre : '' %> &bull; <%= ev.asignatura ? ev.asignatura.nombre : '' %> &bull; Fecha original: <%= ev.fecha %> &bull; Profesor: <%= ev.profesor ? ev.profesor.nombre_completo : '' %>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Alumno</th>
+                                <th>RUT</th>
+                                <th>F. Recuperación</th>
+                                <th>Exigencia</th>
+                                <th>Motivo</th>
+                                <th class="text-end">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% recs.forEach(rec => { %>
+                            <tr>
+                                <td><strong><%= rec.alumno ? rec.alumno.nombre_completo : 'Alumno' %></strong></td>
+                                <td class="text-muted"><%= rec.alumno ? rec.alumno.rut : '' %></td>
+                                <td><span class="badge bg-warning text-dark"><%= rec.fecha_recuperacion %></span></td>
+                                <td>
+                                    <% if (Number(rec.porcentaje_exigencia) >= 70) { %>
+                                    <span class="badge bg-danger">70%</span>
+                                    <% } else { %>
+                                    <span class="badge bg-success">60%</span>
+                                    <% } %>
+                                </td>
+                                <td class="small text-muted"><%= rec.motivo || '-' %></td>
+                                <td class="text-end">
+                                    <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-success" title="Marcar completada"><i class="bi bi-check-lg me-1"></i>Completar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <% }) %>
+</div>
+<% } else { %>
+<div class="card">
+    <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-check-circle display-1 text-success"></i>
+        <p class="mt-3 mb-0">No hay alumnos pendientes de recuperación. ¡Buen trabajo!</p>
+    </div>
+</div>
+<% } %>
+
+<%- include('../partials/footer') %>

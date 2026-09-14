@@ -1,0 +1,6 @@
+{
+  "name": "AgendEx",
+  "description": "Sistema de gestión y calendarización de evaluaciones escolares para Liceo Industrial RBL.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

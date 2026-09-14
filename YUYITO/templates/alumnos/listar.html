@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Alumnos{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Inicio</a></li>
+        <li class="breadcrumb-item active">Alumnos</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h4 class="mb-0"><i class="bi bi-people me-2 text-primary"></i>Alumnos</h4>
+    {% if current_user.puede_admin %}
+    <a href="{{ url_for('alumnos.crear') }}" class="btn btn-success">
+        <i class="bi bi-person-plus me-1"></i>Nuevo Alumno
+    </a>
+    {% endif %}
+</div>
+
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small">Buscar</label>
+                <input type="text" name="busqueda" class="form-control form-control-sm" placeholder="Nombre, apellido o RUT..." value="{{ filtros.busqueda }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Curso</label>
+                <select name="curso_id" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    {% for c in cursos %}
+                    <option value="{{ c.id }}" {% if filtros.curso_id == c.id|string %}selected{% endif %}>{{ c.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-search"></i> Buscar</button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('alumnos.listar') }}" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-x-lg"></i> Limpiar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if alumnos %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>RUT</th>
+                        <th>Nombre</th>
+                        <th>Apellido</th>
+                        <th>Curso</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in alumnos %}
+                    <tr>
+                        <td class="text-muted">{{ a.rut }}</td>
+                        <td>
+                            <a href="{{ url_for('alumnos.perfil', id=a.id) }}" class="text-decoration-none fw-semibold">
+                                {{ a.nombre }}
+                            </a>
+                        </td>
+                        <td>{{ a.apellido }}</td>
+                        <td><span class="badge bg-secondary">{{ a.curso.nombre }}</span></td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('alumnos.perfil', id=a.id) }}" class="btn btn-outline-primary" title="Ver"><i class="bi bi-eye"></i></a>
+                                {% if current_user.puede_admin %}
+                                <a href="{{ url_for('alumnos.editar', id=a.id) }}" class="btn btn-outline-warning" title="Editar"><i class="bi bi-pencil"></i></a>
+                                <form method="POST" action="{{ url_for('alumnos.eliminar', id=a.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar a {{ a.nombre }} {{ a.apellido }}?')">
+                                    <button type="submit" class="btn btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-people display-1"></i>
+            <p class="mt-3">No se encontraron alumnos.</p>
+            <a href="{{ url_for('alumnos.crear') }}" class="btn btn-success"><i class="bi bi-person-plus me-1"></i>Agregar alumno</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

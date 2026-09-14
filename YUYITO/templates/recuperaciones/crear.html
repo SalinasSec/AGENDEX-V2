@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Recuperación{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Inicio</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('recuperaciones.listar') }}">Recuperaciones</a></li>
+        <li class="breadcrumb-item active">Nueva Recuperación</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise me-2"></i>Asignar Fecha de Recuperación</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        La exigencia de la recuperación se calcula automáticamente: si Inspectoría/UTP ya marcó la ausencia como <strong>justificada</strong>, el alumno rinde al <strong>60%</strong> (igual que el curso); si no está justificada, rinde al <strong>70%</strong>.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Evaluación original <span class="text-danger">*</span></label>
+                            <select name="evaluacion_id" id="evalSelect" class="form-select" required>
+                                <option value="">Seleccionar evaluación...</option>
+                                {% for ev in evaluaciones %}
+                                <option value="{{ ev.id }}">{{ ev.titulo }} - {{ ev.curso.nombre }} ({{ ev.fecha.strftime('%d/%m/%Y') }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Alumno <span class="text-danger">*</span></label>
+                            <select name="alumno_id" class="form-select" required>
+                                <option value="">Seleccionar alumno...</option>
+                                {% for a in alumnos %}
+                                <option value="{{ a.id }}">{{ a.nombre_completo }} - {{ a.curso.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha de recuperación <span class="text-danger">*</span></label>
+                            <input type="date" name="fecha_recuperacion" class="form-control" required min="{{ hoy }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Motivo</label>
+                            <input type="text" name="motivo" class="form-control" placeholder="Ej: Ausencia por enfermedad...">
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('recuperaciones.listar') }}" class="btn btn-outline-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i>Asignar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

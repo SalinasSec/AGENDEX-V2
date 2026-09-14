@@ -1,0 +1,58 @@
+<%- include('../partials/header', { 
+    title: 'Nueva Recuperación', 
+    active: 'recuperaciones',
+    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item"><a href="/recuperaciones">Recuperaciones</a></li><li class="breadcrumb-item active">Nueva Recuperación</li></ol></nav>'
+}) %>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise me-2"></i>Asignar Fecha de Recuperación</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/recuperaciones/crear">
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        La exigencia de la recuperación se calcula automáticamente según la normativa: si Inspectoría/UTP marcó la inasistencia como <strong>justificada</strong>, el alumno rinde con un <strong>60%</strong> de exigencia. Si la inasistencia no fue justificada, rinde con un <strong>70%</strong> de exigencia.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Evaluación original <span class="text-danger">*</span></label>
+                            <select name="evaluacion_id" id="evalSelect" class="form-select" required>
+                                <option value="">Seleccionar evaluación...</option>
+                                <% evaluaciones.forEach(ev => { %>
+                                <option value="<%= ev.id %>"><%= ev.titulo %> - <%= ev.curso.nombre %> (<%= ev.fecha %>)</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Alumno <span class="text-danger">*</span></label>
+                            <select name="alumno_id" class="form-select" required>
+                                <option value="">Seleccionar alumno...</option>
+                                <% alumnos.forEach(a => { %>
+                                <option value="<%= a.id %>" <%= alumno_id_preselect == a.id ? 'selected' : '' %>><%= a.nombre_completo %> - <%= a.curso ? a.curso.nombre : '' %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha de recuperación <span class="text-danger">*</span></label>
+                            <input type="date" name="fecha_recuperacion" class="form-control" required min="<%= hoy %>" value="<%= hoy %>">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Motivo</label>
+                            <input type="text" name="motivo" class="form-control" placeholder="Ej: Ausencia por licencia médica, inasistencia imprevista...">
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="/recuperaciones" class="btn btn-outline-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-warning"><i class="bi bi-check-lg me-1"></i>Asignar Recuperación</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

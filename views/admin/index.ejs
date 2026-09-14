@@ -1,0 +1,74 @@
+<%- include('../partials/header', { 
+    title: 'Configuración', 
+    active: 'admin',
+    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item active">Configuración</li></ol></nav>'
+}) %>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h4 class="mb-0"><i class="bi bi-gear me-2 text-primary"></i>Panel de Administración (UTP)</h4>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-lg-3">
+        <a href="/admin/cursos" class="text-decoration-none">
+            <div class="card h-100 hoverable">
+                <div class="card-body text-center py-4">
+                    <div class="stat-icon mx-auto mb-3" style="background:#e8f0fe;color:#1967d2;"><i class="bi bi-building"></i></div>
+                    <h5>Cursos</h5>
+                    <p class="text-muted mb-0"><%= cursos.length %> registrados</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="/admin/asignaturas" class="text-decoration-none">
+            <div class="card h-100 hoverable">
+                <div class="card-body text-center py-4">
+                    <div class="stat-icon mx-auto mb-3" style="background:#fef7e0;color:#b05a00;"><i class="bi bi-book"></i></div>
+                    <h5>Asignaturas</h5>
+                    <p class="text-muted mb-0"><%= asignaturas.length %> registradas</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="/admin/profesores" class="text-decoration-none">
+            <div class="card h-100 hoverable">
+                <div class="card-body text-center py-4">
+                    <div class="stat-icon mx-auto mb-3" style="background:#e6f4ea;color:#137333;"><i class="bi bi-person-badge"></i></div>
+                    <h5>Profesores</h5>
+                    <p class="text-muted mb-0"><%= profesores.length %> registrados</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <a href="/admin/usuarios" class="text-decoration-none">
+            <div class="card h-100 hoverable">
+                <div class="card-body text-center py-4">
+                    <div class="stat-icon mx-auto mb-3" style="background:#fce8e6;color:#c5221f;"><i class="bi bi-people"></i></div>
+                    <h5>Usuarios</h5>
+                    <p class="text-muted mb-0"><%= usuarios.length %> cuentas</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Gestión de la Comunidad Escolar</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">Los alumnos se administran de manera centralizada desde <a href="/alumnos">Alumnos</a>.</p>
+                <p class="text-muted small mb-0">
+                    <strong>Flujo institucional:</strong> 1) Configurar cursos y asignaturas &rarr; 2) Registrar profesores &rarr; 3) Ingresar alumnos &rarr; 4) Gestionar usuarios institucionales &rarr; 5) Profesores y UTP coordinan el calendario respetando la norma de máx. 2 evaluaciones por curso al día.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

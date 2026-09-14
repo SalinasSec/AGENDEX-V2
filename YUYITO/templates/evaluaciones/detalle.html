@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ev.titulo }}{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Inicio</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('evaluaciones.listar') }}">Evaluaciones</a></li>
+        <li class="breadcrumb-item active">{{ ev.titulo }}</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h4 class="mb-1">{{ ev.titulo }}</h4>
+    </div>
+    <div class="d-flex gap-2">
+        {% if current_user.rol == 'profe' and current_user.profesor_id == ev.profesor_id %}
+        <a href="{{ url_for('evaluaciones.editar', id=ev.id) }}" class="btn btn-outline-warning btn-sm"><i class="bi bi-pencil me-1"></i>Editar</a>
+        <form method="POST" action="{{ url_for('evaluaciones.eliminar', id=ev.id) }}" onsubmit="return confirm('¿Estás seguro de eliminar esta evaluación?')">
+            <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Eliminar</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Info de la evaluación -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Detalles</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted" style="width:40%;">Fecha</td>
+                        <td class="fw-semibold">{{ ev.fecha.strftime('%A %d/%m/%Y') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Hora</td>
+                        <td>{{ ev.hora.strftime('%H:%M') if ev.hora else 'No definida' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Asignatura</td>
+                        <td><span class="badge" style="background:{{ ev.asignatura.color }};">{{ ev.asignatura.nombre }}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Curso</td>
+                        <td><strong>{{ ev.curso.nombre }}</strong> ({{ ev.curso.nivel }})</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Profesor</td>
+                        <td>{{ ev.profesor.nombre_completo }}</td>
+                    </tr>
+                </table>
+                {% if ev.descripcion %}
+                <hr>
+                <h6>Descripción</h6>
+                <p class="text-muted mb-0">{{ ev.descripcion }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Asistencia -->
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Asistencia ({{ alumnos|length }} alumnos)</h6>
+            </div>
+            <div class="card-body">
+                {% if alumnos %}
+                {% if current_user.rol in ['profe','inspe','utp'] %}
+                <form method="POST" action="{{ url_for('evaluaciones.registrar_asistencia', id=ev.id) }}">
+                    {% if current_user.rol not in ['inspe','utp'] %}
+                    <p class="text-muted small mb-2"><i class="bi bi-info-circle me-1"></i>Solo Inspectoría o UTP pueden marcar una ausencia como justificada.</p>
+                    {% endif %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:50px;">Asiste</th>
+                                    <th>Alumno</th>
+                                    <th>RUT</th>
+                                    <th>Motivo de ausencia</th>
+                                    <th style="width:110px;">Justificado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for alumno in alumnos %}
+                                {% set asist = asistencias.get(alumno.id) %}
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" name="alumno_{{ alumno.id }}" class="form-check-input"
+                                               {% if not asist or asist.presente %}checked{% endif %}
+                                               onchange="toggleMotivo(this, {{ alumno.id }})">
+                                    </td>
+                                    <td>{{ alumno.nombre_completo }}</td>
+                                    <td class="text-muted small">{{ alumno.rut }}</td>
+                                    <td>
+                                        <input type="text" name="motivo_{{ alumno.id }}" class="form-control form-control-sm"
+                                               placeholder="Motivo si falta..."
+                                               value="{{ asist.motivo if asist and asist.motivo else '' }}"
+                                               id="motivo_{{ alumno.id }}"
+                                               {% if not asist or asist.presente %}disabled{% endif %}>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if current_user.rol in ['inspe','utp'] %}
+                                        <input type="checkbox" name="justificado_{{ alumno.id }}" class="form-check-input"
+                                               id="justificado_{{ alumno.id }}"
+                                               {% if asist and asist.justificado %}checked{% endif %}
+                                               {% if not asist or asist.presente %}disabled{% endif %}
+                                               title="Justificar ausencia (recuperación al 60%)">
+                                        {% else %}
+                                        {% if asist and not asist.presente %}
+                                            {% if asist.justificado %}
+                                            <span class="badge bg-success" title="Justificado por Inspectoría/UTP">Sí</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">No</span>
+                                            {% endif %}
+                                        {% else %}
+                                        <span class="text-muted small">-</span>
+                                        {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-end mt-2">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar Asistencia</button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr><th>Alumno</th><th>RUT</th><th>Estado</th><th>Motivo</th><th>Justificado</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for alumno in alumnos %}
+                            {% set asist = asistencias.get(alumno.id) %}
+                            <tr>
+                                <td>{{ alumno.nombre_completo }}</td>
+                                <td class="text-muted small">{{ alumno.rut }}</td>
+                                <td>
+                                    {% if asist and not asist.presente %}
+                                    <span class="badge bg-danger">Ausente</span>
+                                    {% else %}
+                                    <span class="badge bg-success">Presente</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ asist.motivo if asist and asist.motivo else '-' }}</td>
+                                <td>
+                                    {% if asist and not asist.presente %}
+                                        {% if asist.justificado %}
+                                        <span class="badge bg-success">Sí</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">No</span>
+                                        {% endif %}
+                                    {% else %}
+                                    <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i>Solo Profesores, Inspectoría y UTP pueden modificar la asistencia.</p>
+                {% endif %}
+                {% else %}
+                <p class="text-muted text-center">No hay alumnos en este curso.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleMotivo(checkbox, alumnoId) {
+    const motivoInput = document.getElementById('motivo_' + alumnoId);
+    motivoInput.disabled = checkbox.checked;
+    if (checkbox.checked) motivoInput.value = '';
+
+    const justificadoInput = document.getElementById('justificado_' + alumnoId);
+    if (justificadoInput) {
+        justificadoInput.disabled = checkbox.checked;
+        if (checkbox.checked) justificadoInput.checked = false;
+    }
+}
+</script>
+{% endblock %}

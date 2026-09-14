@@ -1,0 +1,63 @@
+<%- include('../partials/header', { 
+    title: 'Asignaturas', 
+    active: 'admin',
+    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item"><a href="/admin">Configuración</a></li><li class="breadcrumb-item active">Asignaturas</li></ol></nav>'
+}) %>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Registrar Asignatura</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/admin/asignaturas">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" name="nombre" class="form-control" required placeholder="Ej: Lenguaje y Comunicación">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Color distintivo</label>
+                        <input type="color" name="color" class="form-control form-control-color" value="#2563eb">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg me-1"></i>Guardar Asignatura</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-book me-2"></i>Asignaturas Registradas (<%= data.length %>)</h6>
+            </div>
+            <div class="card-body p-0">
+                <% if (data.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr><th>Asignatura</th><th>Color</th><th class="text-end">Acciones</th></tr>
+                        </thead>
+                        <tbody>
+                            <% data.forEach(a => { %>
+                            <tr>
+                                <td class="fw-semibold"><%= a.nombre %></td>
+                                <td><span class="badge" style="background:<%= a.color %>;"><%= a.color %></span></td>
+                                <td class="text-end">
+                                    <form method="POST" action="/admin/asignaturas/<%= a.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar la asignatura <%= a.nombre %>?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } else { %>
+                <p class="text-center text-muted py-4">Aún no hay asignaturas registradas.</p>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

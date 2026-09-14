@@ -1,0 +1,102 @@
+<%- include('../partials/header', { 
+    title: 'Usuarios del Sistema', 
+    active: 'admin',
+    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item"><a href="/admin">Configuración</a></li><li class="breadcrumb-item active">Usuarios</li></ol></nav>'
+}) %>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Crear Usuario</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/admin/usuarios">
+                    <div class="mb-3">
+                        <label class="form-label">RUT <span class="text-danger">*</span></label>
+                        <input type="text" name="rut" class="form-control" required placeholder="Ej: 11.222.333-4">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Correo institucional <span class="text-danger">*</span></label>
+                        <input type="email" name="correo" class="form-control" required placeholder="Ej: profe@liceorbl.cl">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña <span class="text-danger">*</span></label>
+                        <input type="text" name="password" class="form-control" required placeholder="clave123">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nombre visible <span class="text-danger">*</span></label>
+                        <input type="text" name="nombre" class="form-control" required placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rol <span class="text-danger">*</span></label>
+                        <select name="rol" class="form-select" required>
+                            <% Object.entries(roles).forEach(([clave, label]) => { %>
+                            <option value="<%= clave %>"><%= label %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg me-1"></i>Crear Usuario</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Cuentas Registradas (<%= data.length %>)</h6>
+            </div>
+            <div class="card-body p-0">
+                <% if (data.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr><th>Correo</th><th>Nombre</th><th>Rol</th><th>Estado</th><th class="text-end">Acciones</th></tr>
+                        </thead>
+                        <tbody>
+                            <% data.forEach(u => { %>
+                            <tr>
+                                <td class="fw-semibold"><%= u.correo %></td>
+                                <td><%= u.nombre %></td>
+                                <td>
+                                    <% 
+                                        const roleColors = { 'utp': '#8e44ad', 'profe': '#2563eb', 'inspe': '#e67e22', 'alumno': '#16a085' };
+                                        const roleLabels = { 'utp': 'UTP / Directivo', 'profe': 'Profesor', 'inspe': 'Inspectoría', 'alumno': 'Alumno' };
+                                    %>
+                                    <span class="badge" style="background:<%= roleColors[u.rol] || '#6c757d' %>;">
+                                        <%= roleLabels[u.rol] || u.rol %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <% if (u.activo) { %>
+                                    <span class="badge bg-success">Activo</span>
+                                    <% } else { %>
+                                    <span class="badge bg-secondary">Inactivo</span>
+                                    <% } %>
+                                </td>
+                                <td class="text-end">
+                                    <form method="POST" action="/admin/usuarios/<%= encodeURIComponent(u.rut) %>/toggle" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Activar / Desactivar">
+                                            <% if (u.activo) { %><i class="bi bi-pause-circle"></i><% } else { %><i class="bi bi-play-circle"></i><% } %>
+                                        </button>
+                                    </form>
+                                    <% if (u.correo !== 'utp@liceorbl.cl') { %>
+                                    <form method="POST" action="/admin/usuarios/<%= encodeURIComponent(u.rut) %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar al usuario <%= u.correo %>?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } else { %>
+                <p class="text-center text-muted py-4">Aún no hay usuarios.</p>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

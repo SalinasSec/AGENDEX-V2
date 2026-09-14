@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluaciones Pendientes de Recuperación{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Inicio</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('reportes.calendario') }}">Reportes</a></li>
+        <li class="breadcrumb-item active">Pendientes</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h4 class="mb-0"><i class="bi bi-hourglass-split me-2 text-warning"></i>Alumnos Pendientes de Recuperación</h4>
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+</div>
+
+{% if alumnos_por_eval %}
+<div class="accordion" id="accordionPendientes">
+    {% for ev_id, recs in alumnos_por_eval.items() %}
+    {% set ev = recs[0].evaluacion %}
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ ev_id }}">
+                <div class="d-flex justify-content-between w-100 pe-3">
+                    <span><i class="bi bi-clipboard-check me-2"></i>{{ ev.titulo }}</span>
+                    <span class="badge bg-warning text-dark ms-3">{{ recs|length }} alumno(s)</span>
+                </div>
+            </button>
+        </h2>
+        <div id="collapse{{ ev_id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#accordionPendientes">
+            <div class="accordion-body">
+                <div class="mb-2 small text-muted">
+                    {{ ev.curso.nombre }} &middot; {{ ev.asignatura.nombre }} &middot; Fecha original: {{ ev.fecha.strftime('%d/%m/%Y') }} &middot; Profesor: {{ ev.profesor.nombre_completo }}
+                </div>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Alumno</th>
+                            <th>RUT</th>
+                            <th>F. Recuperación</th>
+                            <th>Motivo</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in recs %}
+                        <tr>
+                            <td>{{ rec.alumno.nombre_completo }}</td>
+                            <td class="text-muted">{{ rec.alumno.rut }}</td>
+                            <td><span class="badge bg-warning text-dark">{{ rec.fecha_recuperacion.strftime('%d/%m/%Y') }}</span></td>
+                            <td class="small text-muted">{{ rec.motivo or '-' }}</td>
+                            <td class="text-end">
+                                <form method="POST" action="{{ url_for('recuperaciones.completar', id=rec.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-success" title="Marcar completada"><i class="bi bi-check-lg"></i> Completar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-check-circle display-1 text-success"></i>
+        <p class="mt-3">No hay alumnos pendientes de recuperación. ¡Buen trabajo!</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

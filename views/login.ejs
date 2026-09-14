@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión · AgendEx</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="/css/login.css" rel="stylesheet">
+</head>
+<body>
+    <main class="pantalla">
+
+        <section class="panel-marca">
+            <div class="marca-contenido">
+                <span class="marca-nombre">AgendEx</span>
+                <p class="marca-frase">Agendamiento y control de evaluaciones escolares.</p>
+            </div>
+
+            <svg class="patron" viewBox="0 0 400 400" preserveAspectRatio="none" aria-hidden="true">
+                <line x1="0" y1="80" x2="400" y2="80" />
+                <line x1="0" y1="160" x2="400" y2="160" />
+                <line x1="0" y1="240" x2="400" y2="240" />
+                <line x1="0" y1="320" x2="400" y2="320" />
+                <line x1="100" y1="0" x2="100" y2="400" />
+                <line x1="200" y1="0" x2="200" y2="400" />
+                <line x1="300" y1="0" x2="300" y2="400" />
+                <circle cx="300" cy="240" r="5" />
+                <circle cx="100" cy="160" r="5" />
+                <circle cx="200" cy="320" r="5" />
+            </svg>
+
+            <p class="marca-pie">Alumnos · Profesores · UTP · Inspectoría</p>
+        </section>
+
+        <section class="panel-formulario">
+            <div class="formulario-envoltorio">
+
+                <% if (typeof messages !== 'undefined' && messages && messages.length > 0) { %>
+                    <% messages.forEach(msg => { %>
+                    <div class="aviso aviso-<%= msg.category === 'error' ? 'danger' : msg.category %>">
+                        <%= msg.message %>
+                    </div>
+                    <% }) %>
+                <% } %>
+
+                <header class="formulario-encabezado">
+                    <h1>Inicia sesión</h1>
+                    <p class="rol-frase" id="rolFrase">Ingresa con tu correo institucional.</p>
+                </header>
+
+                <div class="tabs-rol">
+                    <button type="button" class="tab-rol activo" data-correo="utp@liceorbl.cl" data-clave="utp123" data-frase="Acceso de Gestión Curricular y Administración (UTP).">UTP</button>
+                    <button type="button" class="tab-rol" data-correo="carolina.reyes@liceosofofa.cl" data-clave="profe123" data-frase="Acceso para Profesores: agenda pruebas y pasa lista.">Profesor</button>
+                    <button type="button" class="tab-rol" data-correo="inspe.diaz@liceorbl.cl" data-clave="inspe123" data-frase="Acceso Inspectoría: justificación de inasistencias.">Inspectoría</button>
+                    <button type="button" class="tab-rol" data-correo="joaquin.rivas@liceorbl.cl" data-clave="alumno123" data-frase="Acceso de Alumno: calendario y recuperaciones.">Alumno</button>
+                </div>
+
+                <form class="formulario" method="POST" action="/auth/login">
+                    <div class="campo">
+                        <input type="email" id="correo" name="correo" value="utp@liceorbl.cl" placeholder=" " required autocomplete="username" autofocus>
+                        <label for="correo">Correo institucional</label>
+                    </div>
+
+                    <div class="campo">
+                        <input type="password" id="password" name="password" value="utp123" placeholder=" " required autocomplete="current-password">
+                        <label for="password">Contraseña</label>
+                    </div>
+
+                    <button type="submit" class="boton-entrar">
+                        <span class="boton-texto">Entrar</span>
+                        <span class="spinner" aria-hidden="true"></span>
+                    </button>
+                </form>
+
+                <p class="pie-registro">Plataforma de gestión académica · Liceo Industrial RBL</p>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const formulario = document.querySelector('.formulario');
+        const boton = document.querySelector('.boton-entrar');
+        const panelFormulario = document.querySelector('.panel-formulario');
+        const campoCorreo = document.getElementById('correo');
+        const campoPassword = document.getElementById('password');
+        const avisoError = document.querySelector('.aviso-danger');
+        const rolFrase = document.getElementById('rolFrase');
+        const tabsRol = document.querySelectorAll('.tab-rol');
+
+        tabsRol.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabsRol.forEach(t => t.classList.remove('activo'));
+                tab.classList.add('activo');
+                campoCorreo.value = tab.dataset.correo;
+                campoPassword.value = tab.dataset.clave;
+                rolFrase.textContent = tab.dataset.frase;
+            });
+        });
+
+        requestAnimationFrame(() => {
+            panelFormulario.classList.add('animado');
+        });
+
+        if (avisoError) {
+            formulario.classList.add('error');
+            formulario.addEventListener('animationend', () => {
+                formulario.classList.remove('error');
+            }, { once: true });
+        }
+
+        campoCorreo.addEventListener('keydown', (evento) => {
+            if (evento.key === 'Enter') {
+                evento.preventDefault();
+                campoPassword.focus();
+            }
+        });
+
+        formulario.addEventListener('submit', () => {
+            boton.classList.add('loading');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% set today = today %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block breadcrumb %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item active">Dashboard</li>
+    </ol>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#E9E2D1;color:#14213D;">
+                <i class="bi bi-clipboard-check"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.total_evaluaciones }}</span>
+                <span class="stat-label">Total Evaluaciones</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#F6E7CB;color:#A87F2C;">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.evals_hoy }}</span>
+                <span class="stat-label">Evaluaciones Hoy</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#E3EDF3;color:#2C5F7A;">
+                <i class="bi bi-calendar-week"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.evals_semana }}</span>
+                <span class="stat-label">Esta Semana</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#E6EFE9;color:#2F6F4E;">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.total_alumnos }}</span>
+                <span class="stat-label">Alumnos</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#F6E3DE;color:#A5332A;">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number">{{ stats.recuperaciones_pendientes }}</span>
+                <span class="stat-label">Recup. Pendientes</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-lg-2">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#E3EDF3;color:#14213D;">
+                <i class="bi bi-building"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-number">{{ total_cursos }}</span>
+                <span class="stat-label">Cursos</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Evaluaciones de hoy -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-calendar-day text-warning me-2"></i>Evaluaciones de Hoy</h5>
+                <span class="badge bg-primary">{{ evals_hoy|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if evals_hoy %}
+                <div class="list-group list-group-flush">
+                    {% for ev in evals_hoy %}
+                    <a href="{{ url_for('evaluaciones.detalle', id=ev.id) }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ ev.titulo }}</h6>
+                                <small class="text-muted">
+                                    {{ ev.asignatura.nombre }} &middot; {{ ev.curso.nombre }}
+                                    {% if ev.hora %} &middot; {{ ev.hora.strftime('%H:%M') }}{% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-x display-4"></i>
+                    <p class="mt-2">No hay evaluaciones programadas para hoy.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Evaluaciones de la semana -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-calendar-week text-success me-2"></i>Esta Semana</h5>                <span class="badge bg-success">{{ evals_semana|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if evals_semana %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Evaluación</th>
+                                <th>Curso</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in evals_semana %}
+                            <tr>
+                                <td>{{ ev.fecha.strftime('%d/%m') }}</td>
+                                <td>{{ ev.titulo }}</td>
+                                <td>{{ ev.curso.nombre }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-x display-4"></i>
+                    <p class="mt-2">No hay evaluaciones esta semana.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Evaluaciones por curso -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="bi bi-bar-chart text-info me-2"></i>Por Curso</h5>
+            </div>
+            <div class="card-body">
+                {% if evals_por_curso %}
+                {% set max_evals = evals_por_curso|map(attribute=1)|max %}
+                {% for curso_nombre, count in evals_por_curso %}
+                <div class="d-flex align-items-center mb-2">
+                    <span style="width:100px;" class="text-truncate small">{{ curso_nombre }}</span>
+                    <div class="progress flex-grow-1 mx-2" style="height:20px;">
+                        <div class="progress-bar bg-info" style="width:{{ (count / max_evals * 100)|round(0) }}%;">{{ count }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted text-center">Sin datos</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recuperaciones pendientes -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise text-danger me-2"></i>Recuperaciones Pendientes</h5>
+                <span class="badge bg-danger">{{ recuperaciones_pendientes|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if recuperaciones_pendientes %}
+                <div class="list-group list-group-flush">
+                    {% for rec in recuperaciones_pendientes %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>{{ rec.alumno.nombre_completo }}</strong>
+                                <br><small class="text-muted">{{ rec.evaluacion.titulo }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-warning text-dark">{{ rec.fecha_recuperacion.strftime('%d/%m/%Y') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="text-center mt-2">
+                    <a href="{{ url_for('recuperaciones.listar') }}" class="btn btn-sm btn-outline-danger">Ver todas</a>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-check-circle display-4 text-success"></i>
+                    <p class="mt-2">No hay recuperaciones pendientes.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick actions -->
+<div class="mt-4">
+    <div class="card">
+        <div class="card-body py-3">
+            <h6 class="card-title text-muted mb-3">Accesos Rápidos</h6>
+            <div class="d-flex flex-wrap gap-2">
+                {% if current_user.puede_gestionar_evaluaciones %}
+                <a href="{{ url_for('evaluaciones.crear') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-1"></i>Nueva Evaluación
+                </a>
+                {% endif %}
+                {% if current_user.puede_admin %}
+                <a href="{{ url_for('alumnos.crear') }}" class="btn btn-success">
+                    <i class="bi bi-person-plus me-1"></i>Nuevo Alumno
+                </a>
+                {% endif %}
+                {% if current_user.rol in ['utp','profe','inspe'] %}
+                <a href="{{ url_for('recuperaciones.crear') }}" class="btn btn-warning">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Nueva Recuperación
+                </a>
+                {% endif %}
+                <a href="{{ url_for('reportes.calendario') }}" class="btn btn-info text-white">
+                    <i class="bi bi-calendar3 me-1"></i>Ver Calendario
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

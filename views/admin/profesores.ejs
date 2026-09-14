@@ -1,0 +1,68 @@
+<%- include('../partials/header', { 
+    title: 'Profesores', 
+    active: 'admin',
+    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item"><a href="/admin">Configuración</a></li><li class="breadcrumb-item active">Profesores</li></ol></nav>'
+}) %>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Registrar Profesor</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/admin/profesores">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" name="nombre" class="form-control" required placeholder="Ej: Marcela">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input type="text" name="apellido" class="form-control" required placeholder="Ej: Ríos">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="marcela.rios@liceorbl.cl">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg me-1"></i>Guardar Profesor</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Profesores Registrados (<%= data.length %>)</h6>
+            </div>
+            <div class="card-body p-0">
+                <% if (data.length > 0) { %>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr><th>Nombre</th><th>Apellido</th><th>Email</th><th class="text-end">Acciones</th></tr>
+                        </thead>
+                        <tbody>
+                            <% data.forEach(p => { %>
+                            <tr>
+                                <td class="fw-semibold"><%= p.nombre %></td>
+                                <td><%= p.apellido %></td>
+                                <td class="text-muted small"><%= p.email || '-' %></td>
+                                <td class="text-end">
+                                    <form method="POST" action="/admin/profesores/<%= p.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar al profesor <%= p.nombre %> <%= p.apellido %>?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } else { %>
+                <p class="text-center text-muted py-4">Aún no hay profesores registrados.</p>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>
