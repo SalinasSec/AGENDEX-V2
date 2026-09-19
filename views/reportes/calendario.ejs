@@ -4,27 +4,47 @@
     breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item active">Calendario</li></ol></nav>'
 }) %>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <h4 class="mb-0"><i class="bi bi-calendar3 me-2 text-primary"></i>Calendario de Evaluaciones</h4>
-    <div class="d-flex gap-2 align-items-center">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h4 class="mb-0"><i class="bi bi-calendar3 me-2 text-primary"></i>Calendario Escolar</h4>
+        <small class="text-muted">Vista mensual de evaluaciones calendarizadas y recuperaciones programadas</small>
+    </div>
+    
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2">
+            <i class="bi bi-clipboard-check me-1"></i><strong><%= total_evals_mes %></strong> Evaluaciones
+        </span>
+        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2">
+            <i class="bi bi-arrow-counterclockwise me-1"></i><strong><%= total_recups_mes %></strong> Recuperaciones
+        </span>
+
         <% 
             const prevMes = mes > 1 ? mes - 1 : 12;
             const prevAnio = mes > 1 ? anio : anio - 1;
             const nextMes = mes < 12 ? mes + 1 : 1;
-            const nextAnio = mes < 12 ? anio : anio + 1;
+            const nextAnio = mes < 12 ? anio + 1 : anio;
         %>
-        <a href="/reportes/calendario?mes=<%= prevMes %>&anio=<%= prevAnio %>&curso_id=<%= filtros.curso_id || '' %>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
-        <span class="fw-bold fs-5"><%= mes_nombre %> <%= anio %></span>
-        <a href="/reportes/calendario?mes=<%= nextMes %>&anio=<%= nextAnio %>&curso_id=<%= filtros.curso_id || '' %>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
-        <a href="/reportes/calendario" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-calendar2-week me-1"></i>Hoy</a>
+        <div class="btn-group ms-sm-2" role="group">
+            <a href="/reportes/calendario?mes=<%= prevMes %>&anio=<%= prevAnio %><%= filtros.curso_id ? '&curso_id=' + filtros.curso_id : '' %>" class="btn btn-sm btn-outline-secondary" title="Mes Anterior">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <span class="btn btn-sm btn-light border px-3 fw-bold disabled text-dark">
+                <%= mes_nombre %> <%= anio %>
+            </span>
+            <a href="/reportes/calendario?mes=<%= nextMes %>&anio=<%= nextAnio %><%= filtros.curso_id ? '&curso_id=' + filtros.curso_id : '' %>" class="btn btn-sm btn-outline-secondary" title="Mes Siguiente">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+        <a href="/reportes/calendario" class="btn btn-sm btn-outline-primary"><i class="bi bi-calendar-event me-1"></i>Hoy</a>
     </div>
 </div>
 
-<div class="card mb-4">
+<!-- Filtros de Navegación Rápida -->
+<div class="card shadow-sm border-0 mb-4">
     <div class="card-body py-3">
-        <form method="GET" action="/reportes/calendario" class="row g-2 align-items-center">
+        <form method="GET" action="/reportes/calendario" class="row g-2 align-items-end">
             <div class="col-6 col-sm-auto">
-                <label class="form-label small mb-1">Mes</label>
+                <label class="form-label small mb-1 fw-semibold">Mes</label>
                 <select name="mes" class="form-select form-select-sm">
                     <% meses.forEach(m => { %>
                     <option value="<%= m.num %>" <%= m.num === mes ? 'selected' : '' %>><%= m.nombre %></option>
@@ -32,58 +52,125 @@
                 </select>
             </div>
             <div class="col-6 col-sm-auto">
-                <label class="form-label small mb-1">Año</label>
+                <label class="form-label small mb-1 fw-semibold">Año</label>
                 <input type="number" name="anio" class="form-control form-control-sm" value="<%= anio %>" style="max-width:110px;">
             </div>
             <% if (current_user.rol !== 'alumno') { %>
             <div class="col-12 col-sm-auto">
-                <label class="form-label small mb-1">Curso</label>
+                <label class="form-label small mb-1 fw-semibold">Filtrar por Curso</label>
                 <select name="curso_id" class="form-select form-select-sm">
                     <option value="">Todos los cursos</option>
                     <% cursos.forEach(c => { %>
-                    <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %></option>
+                    <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
                     <% }) %>
                 </select>
             </div>
-            <% } %>
-            <div class="col-12 col-sm-auto mt-2 mt-sm-auto pt-sm-3">
-                <button type="submit" class="btn btn-primary btn-sm w-100 w-sm-auto"><i class="bi bi-search"></i> Ir al mes</button>
+            <% } else { %>
+            <div class="col-12 col-sm-auto">
+                <span class="badge bg-info-subtle text-info border border-info-subtle py-2 px-3">
+                    <i class="bi bi-mortarboard me-1"></i>Viendo sólo tu calendario escolar
+                </span>
             </div>
+            <% } %>
+            <div class="col-12 col-sm-auto">
+                <button type="submit" class="btn btn-primary btn-sm w-100 w-sm-auto px-3">
+                    <i class="bi bi-funnel me-1"></i> Aplicar Filtro
+                </button>
+            </div>
+            <% if (filtros.curso_id) { %>
+            <div class="col-12 col-sm-auto">
+                <a href="/reportes/calendario?mes=<%= mes %>&anio=<%= anio %>" class="btn btn-sm btn-outline-secondary w-100 w-sm-auto">
+                    <i class="bi bi-x-circle me-1"></i> Quitar filtro de curso
+                </a>
+            </div>
+            <% } %>
         </form>
     </div>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <div class="d-block d-md-none text-muted small mb-2">
-            <i class="bi bi-arrow-left-right me-1 text-primary"></i>Desliza hacia los lados para ver los 7 días
+<!-- Vista Calendario Grid -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-2 p-md-3">
+        <div class="d-block d-md-none text-muted small mb-2 text-center">
+            <i class="bi bi-arrow-left-right me-1 text-primary"></i>Desliza horizontalmente para ver la semana completa
         </div>
+
         <div class="table-responsive">
-            <table class="table table-bordered text-center calendar-table mb-0">
+            <table class="table table-bordered mb-0" style="min-width: 780px;">
                 <thead>
-                    <tr class="table-light">
-                        <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
+                    <tr class="table-light text-center">
+                        <th style="width: 14.28%;">Lunes</th>
+                        <th style="width: 14.28%;">Martes</th>
+                        <th style="width: 14.28%;">Miércoles</th>
+                        <th style="width: 14.28%;">Jueves</th>
+                        <th style="width: 14.28%;">Viernes</th>
+                        <th style="width: 14.28%;" class="text-muted">Sábado</th>
+                        <th style="width: 14.28%;" class="text-muted">Domingo</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% semanas.forEach(semana => { %>
                     <tr>
-                        <% semana.forEach(dia => { %>
+                        <% semana.forEach((dia, indexDia) => { %>
                             <% if (dia === 0) { %>
-                            <td class="text-muted bg-light" style="height:110px;width:14%;"></td>
+                            <td class="bg-light-subtle" style="height: 125px; min-width: 110px;"></td>
                             <% } else { %>
-                            <td class="align-top <%= (dia === today_day && anio === today_year && mes === today_month) ? 'today-cell' : '' %>" style="height:110px;width:14%;">
-                                <span class="fw-bold <%= (dia === today_day && anio === today_year && mes === today_month) ? 'text-primary' : '' %>"><%= dia %></span>
-                                <% if (evals_por_dia[dia] && evals_por_dia[dia].length > 0) { %>
-                                <div class="mt-1 d-flex flex-column gap-1">
-                                    <% evals_por_dia[dia].forEach(ev => { %>
-                                    <a href="/evaluaciones/<%= ev.id %>" class="text-start text-decoration-none calendar-event text-white small p-1 rounded d-block" style="background:<%= ev.asignatura ? ev.asignatura.color : '#0d6efd' %>;">
-                                        <div class="fw-semibold text-truncate"><%= ev.titulo %></div>
-                                        <span class="opacity-75" style="font-size:0.7rem;"><%= ev.curso ? ev.curso.nombre : '' %> &bull; <%= ev.hora || '' %></span>
-                                    </a>
-                                    <% }) %>
+                            <% const esHoy = (dia === today_day && anio === today_year && mes === today_month); %>
+                            <% const esFinde = (indexDia >= 5); %>
+                            <td class="align-top position-relative <%= esHoy ? 'bg-primary-subtle border-primary' : (esFinde ? 'bg-light' : '') %>" 
+                                style="height: 125px; min-width: 110px;">
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge <%= esHoy ? 'bg-primary text-white rounded-pill px-2' : (esFinde ? 'text-muted' : 'text-dark fw-bold') %>">
+                                        <%= dia %>
+                                    </span>
+                                    <% if (esHoy) { %>
+                                    <span class="badge bg-primary text-white text-uppercase" style="font-size: 0.6rem;">Hoy</span>
+                                    <% } %>
                                 </div>
-                                <% } %>
+
+                                <div class="d-flex flex-column gap-1">
+                                    <!-- Evaluaciones Regulares -->
+                                    <% if (evals_por_dia[dia] && evals_por_dia[dia].length > 0) { %>
+                                        <% evals_por_dia[dia].forEach(ev => { %>
+                                        <a href="/evaluaciones/<%= ev.id %>" 
+                                           class="text-start text-decoration-none text-white small p-1 rounded shadow-xs d-block" 
+                                           style="background:<%= (ev.asignatura && ev.asignatura.color) ? ev.asignatura.color : '#0d6efd' %>; transition: transform 0.15s ease;"
+                                           title="<%= ev.titulo %> &mdash; <%= ev.curso ? ev.curso.nombre : '' %> (<%= ev.hora || '' %>)">
+                                            <div class="fw-semibold text-truncate" style="font-size: 0.78rem;">
+                                                <i class="bi bi-pencil-square me-1"></i><%= ev.titulo %>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center opacity-90" style="font-size: 0.68rem;">
+                                                <span class="text-truncate"><%= ev.curso ? ev.curso.nombre : '' %></span>
+                                                <span><%= ev.hora || '' %></span>
+                                            </div>
+                                        </a>
+                                        <% }) %>
+                                    <% } %>
+
+                                    <!-- Recuperaciones Programadas -->
+                                    <% if (recups_por_dia[dia] && recups_por_dia[dia].length > 0) { %>
+                                        <% recups_por_dia[dia].forEach(r => { %>
+                                        <% 
+                                            const esSalida = (r.tipo_justificacion === 'salida_pedagogica') || (r.motivo && r.motivo.toLowerCase().includes('salida'));
+                                            const exig70 = Number(r.porcentaje_exigencia) >= 70;
+                                        %>
+                                        <a href="/recuperaciones" 
+                                           class="text-start text-decoration-none small p-1 rounded border shadow-xs d-block <%= exig70 ? 'bg-danger-subtle border-danger text-danger-emphasis' : (esSalida ? 'bg-info-subtle border-info text-info-emphasis' : 'bg-warning-subtle border-warning text-warning-emphasis') %>"
+                                           title="Recuperación: <%= r.alumno ? (r.alumno.nombre_completo || r.alumno.nombre) : 'Alumno' %> &bull; Exigencia: <%= Math.round(r.porcentaje_exigencia) %>%">
+                                            <div class="fw-bold text-truncate" style="font-size: 0.74rem;">
+                                                <i class="bi bi-arrow-counterclockwise"></i> Recup: <%= r.alumno ? (r.alumno.nombre_completo || r.alumno.nombre) : 'Alumno' %>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center" style="font-size: 0.66rem;">
+                                                <span class="text-truncate"><%= r.evaluacion ? r.evaluacion.titulo : 'Prueba' %></span>
+                                                <span class="badge <%= exig70 ? 'bg-danger' : (esSalida ? 'bg-info text-dark' : 'bg-success') %>">
+                                                    <%= Math.round(r.porcentaje_exigencia) %>%
+                                                </span>
+                                            </div>
+                                        </a>
+                                        <% }) %>
+                                    <% } %>
+                                </div>
                             </td>
                             <% } %>
                         <% }) %>
@@ -91,6 +178,31 @@
                     <% }) %>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Leyenda Informativa -->
+<div class="card shadow-sm border-0">
+    <div class="card-body py-3">
+        <h6 class="card-title fw-bold small text-muted text-uppercase mb-2">Leyenda del Calendario</h6>
+        <div class="d-flex flex-wrap gap-3 align-items-center small">
+            <div class="d-flex align-items-center gap-1">
+                <span class="badge bg-primary">&nbsp;&nbsp;</span>
+                <span>Evaluación regular de curso</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <span class="badge bg-success">60%</span>
+                <span>Recuperación con Certificado Médico (60% regular)</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <span class="badge bg-info text-dark">60%</span>
+                <span>Recuperación por Salida Pedagógica oficial (60% regular)</span>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <span class="badge bg-danger">70%</span>
+                <span>Recuperación Injustificada (70% escala reglamentaria)</span>
+            </div>
         </div>
     </div>
 </div>

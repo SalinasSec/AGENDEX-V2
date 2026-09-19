@@ -5,56 +5,116 @@
 }) %>
 
 <div class="row justify-content-center">
-    <div class="col-12 col-md-10 col-lg-8 col-xl-7">
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Asignar Fecha de Recuperación</h5>
+    <div class="col-12 col-md-10 col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3">
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-warning text-dark me-2 fs-6"><i class="bi bi-shield-check"></i> Inspectoría</span>
+                    <h5 class="card-title mb-0 fw-bold">Registrar Justificativo y Programar Recuperación</h5>
+                </div>
             </div>
-            <div class="card-body">
-                <form method="POST" action="/recuperaciones/crear">
-                    <div class="alert alert-info small mb-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        La exigencia de la recuperación se calcula automáticamente según la normativa: si Inspectoría/UTP marcó la inasistencia como <strong>justificada</strong>, el alumno rinde con un <strong>60%</strong> de exigencia. Si la inasistencia no fue justificada, rinde con un <strong>70%</strong> de exigencia.
+            <div class="card-body p-4">
+                <!-- Marco normativo y reglas de exigencia -->
+                <div class="alert alert-light border border-info-subtle mb-4">
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="bi bi-info-circle-fill text-primary fs-5 mt-1"></i>
+                        <div>
+                            <strong class="d-block text-dark mb-1">Criterio Reglamentario de Exigencia:</strong>
+                            <ul class="small text-muted mb-0 ps-3">
+                                <li><strong>Certificado Médico:</strong> Inasistencia médica recepcionada en Inspectoría &rarr; <span class="badge bg-success">60% de exigencia (Misma regular)</span></li>
+                                <li><strong>Salida Pedagógica:</strong> Alumnos en comisiones, torneos o salidas escolares autorizadas &rarr; <span class="badge bg-info text-dark">60% de exigencia (Misma regular)</span></li>
+                                <li><strong>Fuerza Mayor:</strong> Justificado formalmente en Inspectoría &rarr; <span class="badge bg-success">60% de exigencia</span></li>
+                                <li><strong>Inasistencia Injustificada:</strong> No se presentó documento en plazo &rarr; <span class="badge bg-danger">70% de exigencia</span></li>
+                            </ul>
+                        </div>
                     </div>
+                </div>
+
+                <form method="POST" action="/recuperaciones/crear" id="formRecuperacion">
                     <div class="row g-3">
+                        <!-- Selección de Evaluación -->
                         <div class="col-12">
-                            <label class="form-label">Evaluación original <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">1. Evaluación Original <span class="text-danger">*</span></label>
                             <select name="evaluacion_id" id="evalSelect" class="form-select" required>
-                                <option value="">Seleccionar evaluación...</option>
+                                <option value="">-- Seleccionar evaluación original --</option>
                                 <% evaluaciones.forEach(ev => { %>
-                                <option value="<%= ev.id %>"><%= ev.titulo %> — <%= ev.curso.nombre %> (<%= ev.fecha %>)</option>
+                                    <% const cursoNombre = ev.curso ? ev.curso.nombre : (ev.curso_id ? 'Curso #' + ev.curso_id : 'Sin Curso'); %>
+                                    <% const asigNombre = ev.asignatura ? ev.asignatura.nombre : 'Asignatura'; %>
+                                    <option value="<%= ev.id %>" 
+                                            data-curso-id="<%= ev.curso_id %>"
+                                            <%= (typeof evaluacion_id_preselect !== 'undefined' && evaluacion_id_preselect == ev.id) ? 'selected' : '' %>>
+                                        <%= ev.titulo %> &bull; <%= cursoNombre %> (<%= ev.fecha %>) &mdash; [<%= asigNombre %>]
+                                    </option>
                                 <% }) %>
                             </select>
                         </div>
+
+                        <!-- Selección de Alumno -->
                         <div class="col-12">
-                            <label class="form-label">Alumno <span class="text-danger">*</span></label>
-                            <select name="alumno_id" class="form-select" required>
-                                <option value="">Seleccionar alumno...</option>
+                            <label class="form-label fw-semibold">2. Alumno que rinde recuperación <span class="text-danger">*</span></label>
+                            <select name="alumno_id" id="alumnoSelect" class="form-select" required>
+                                <option value="">-- Seleccionar alumno ausente --</option>
                                 <% alumnos.forEach(a => { %>
-                                <option value="<%= a.id %>" <%= alumno_id_preselect == a.id ? 'selected' : '' %>><%= a.nombre_completo %> — <%= a.curso ? a.curso.nombre : '' %></option>
+                                    <% const cursoAlumno = a.curso ? a.curso.nombre : ''; %>
+                                    <option value="<%= a.id %>" 
+                                            data-curso-id="<%= a.curso_id %>"
+                                            <%= (typeof alumno_id_preselect !== 'undefined' && alumno_id_preselect == a.id) ? 'selected' : '' %>>
+                                        <%= a.nombre_completo || (a.nombre + ' ' + a.apellido) %> (<%= a.rut %>) <%= cursoAlumno ? '&mdash; Curso ' + cursoAlumno : '' %>
+                                    </option>
                                 <% }) %>
                             </select>
+                            <div class="form-text" id="filtroTextoAyuda">Al seleccionar una evaluación, se destacarán los alumnos de ese curso.</div>
                         </div>
-                        <div class="col-12 col-sm-6">
-                            <label class="form-label">Fecha de recuperación <span class="text-danger">*</span></label>
+
+                        <!-- Tipo de Justificación / Motivo -->
+                        <div class="col-12 col-md-7">
+                            <label class="form-label fw-semibold">3. Tipo de Justificación ante Inspectoría <span class="text-danger">*</span></label>
+                            <select name="tipo_justificacion" id="tipoJustificacion" class="form-select" required>
+                                <option value="medico" selected>🏥 Certificado Médico (Exigencia normal: 60%)</option>
+                                <option value="salida_pedagogica">🚌 Salida Pedagógica / Actividad Oficial (Exigencia normal: 60%)</option>
+                                <option value="fuerza_mayor">📋 Caso Fortuito o Causa Mayor Acreditada (Exigencia normal: 60%)</option>
+                                <option value="injustificada">⚠️ Inasistencia Injustificada (Exigencia aumentada: 70%)</option>
+                            </select>
+                        </div>
+
+                        <!-- Fecha de Recuperación -->
+                        <div class="col-12 col-md-5">
+                            <label class="form-label fw-semibold">4. Fecha de Recuperación <span class="text-danger">*</span></label>
                             <input type="date" name="fecha_recuperacion" class="form-control" required min="<%= hoy %>" value="<%= hoy %>">
                         </div>
-                        <div class="col-12 col-sm-6">
-                            <label class="form-label">Exigencia reglamentaria</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="bi bi-shield-check"></i></span>
-                                <input type="text" class="form-control bg-light" value="Automática (60% / 70%)" readonly>
+
+                        <!-- Visualizador de Exigencia Dinámica -->
+                        <div class="col-12">
+                            <div id="cajaExigencia" class="p-3 rounded border bg-success-subtle border-success text-success-emphasis d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i id="iconoExigencia" class="bi bi-check-circle-fill fs-4 text-success"></i>
+                                    <div>
+                                        <div class="fw-bold" id="tituloExigencia">Exigencia Aplicada: 60% (Sin Penalización)</div>
+                                        <div class="small text-muted" id="descExigencia">Inasistencia justificada debidamente por Inspectoría. El alumno rinde en igualdad de condiciones.</div>
+                                    </div>
+                                </div>
+                                <span class="badge bg-success fs-5 px-3 py-2" id="badgeExigencia">60%</span>
                             </div>
                         </div>
+
+                        <!-- Observaciones o Detalle del Documento -->
                         <div class="col-12">
-                            <label class="form-label">Motivo o justificación</label>
-                            <input type="text" name="motivo" class="form-control" placeholder="Ej: Ausencia por licencia médica, inasistencia justificada...">
+                            <label class="form-label fw-semibold">5. Detalle / Folio de Justificativo en Inspectoría</label>
+                            <input type="text" name="motivo" id="motivoInput" class="form-control" 
+                                   placeholder="Ej: Certificado médico Dr. Soto N° 44102, o: Delegación Salida Pedagógica Robótica">
+                            <div class="form-text">Especifica los datos del certificado médico presentado o el nombre de la salida escolar.</div>
                         </div>
                     </div>
-                    <hr>
-                    <div class="d-flex flex-wrap justify-content-end gap-2">
-                        <a href="/recuperaciones" class="btn btn-outline-secondary w-100 w-sm-auto text-center">Cancelar</a>
-                        <button type="submit" class="btn btn-warning w-100 w-sm-auto"><i class="bi bi-check-lg me-1"></i>Asignar Recuperación</button>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <a href="/recuperaciones" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Volver a Recuperaciones
+                        </a>
+                        <button type="submit" class="btn btn-warning px-4 fw-bold">
+                            <i class="bi bi-check-circle-fill me-1"></i> Confirmar y Asignar Recuperación
+                        </button>
                     </div>
                 </form>
             </div>
@@ -62,4 +122,71 @@
     </div>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', {
+    scripts: `
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tipoSelect = document.getElementById('tipoJustificacion');
+    const caja = document.getElementById('cajaExigencia');
+    const icono = document.getElementById('iconoExigencia');
+    const titulo = document.getElementById('tituloExigencia');
+    const desc = document.getElementById('descExigencia');
+    const badge = document.getElementById('badgeExigencia');
+    const evalSelect = document.getElementById('evalSelect');
+    const alumnoSelect = document.getElementById('alumnoSelect');
+
+    function actualizarExigencia() {
+        const val = tipoSelect.value;
+        if (val === 'injustificada') {
+            caja.className = 'p-3 rounded border bg-danger-subtle border-danger text-danger-emphasis d-flex align-items-center justify-content-between';
+            icono.className = 'bi bi-exclamation-octagon-fill fs-4 text-danger';
+            titulo.textContent = 'Exigencia Aplicada: 70% (Escala Diferenciada)';
+            desc.textContent = 'Inasistencia sin documento probatorio. Se aplica el 70% de exigencia según reglamento.';
+            badge.className = 'badge bg-danger fs-5 px-3 py-2';
+            badge.textContent = '70%';
+        } else if (val === 'salida_pedagogica') {
+            caja.className = 'p-3 rounded border bg-info-subtle border-info text-info-emphasis d-flex align-items-center justify-content-between';
+            icono.className = 'bi bi-bus-front-fill fs-4 text-info';
+            titulo.textContent = 'Exigencia Aplicada: 60% (Salida Pedagógica Oficial)';
+            desc.textContent = 'Inasistencia justificada por salida institucional. Se mantiene la misma exigencia que el resto del curso (60%).';
+            badge.className = 'badge bg-info text-dark fs-5 px-3 py-2';
+            badge.textContent = '60%';
+        } else {
+            caja.className = 'p-3 rounded border bg-success-subtle border-success text-success-emphasis d-flex align-items-center justify-content-between';
+            icono.className = 'bi bi-check-circle-fill fs-4 text-success';
+            titulo.textContent = 'Exigencia Aplicada: 60% (Certificado Médico Válido)';
+            desc.textContent = 'Inasistencia de salud acreditada ante Inspectoría. Se mantiene la misma exigencia regular (60%).';
+            badge.className = 'badge bg-success fs-5 px-3 py-2';
+            badge.textContent = '60%';
+        }
+    }
+
+    tipoSelect.addEventListener('change', actualizarExigencia);
+    actualizarExigencia();
+
+    // Filtrar u ordenar alumnos según curso de la evaluación seleccionada
+    evalSelect.addEventListener('change', () => {
+        const selectedOption = evalSelect.options[evalSelect.selectedIndex];
+        const cursoId = selectedOption ? selectedOption.getAttribute('data-curso-id') : null;
+        if (!cursoId) return;
+
+        let primeraCoincidencia = null;
+        for (let i = 0; i < alumnoSelect.options.length; i++) {
+            const opt = alumnoSelect.options[i];
+            const optCurso = opt.getAttribute('data-curso-id');
+            if (optCurso === cursoId) {
+                opt.style.fontWeight = 'bold';
+                opt.style.color = '#0d6efd';
+                if (!primeraCoincidencia && opt.value) {
+                    primeraCoincidencia = opt.value;
+                }
+            } else {
+                opt.style.fontWeight = 'normal';
+                opt.style.color = '';
+            }
+        }
+    });
+});
+</script>
+`
+}) %>

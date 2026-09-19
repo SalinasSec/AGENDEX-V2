@@ -198,7 +198,8 @@ const handleDemoLogin = (req, res) => {
   const { rol } = req.params;
   let correo = 'inspe.diaz@liceorbl.cl';
   if (rol === 'utp') correo = 'utp@liceorbl.cl';
-  else if (rol === 'profe' || rol === 'profesor') correo = 'carolina.reyes@liceosofofa.cl';
+  else if (rol === 'profe' || rol === 'profesor' || rol === 'marcela') correo = 'marcela.rubio@liceorbl.cl';
+  else if (rol === 'antonio') correo = 'antonio.velasquez@liceorbl.cl';
   else if (rol === 'inspe' || rol === 'inspectoria') correo = 'inspe.diaz@liceorbl.cl';
   else if (rol === 'alumno') correo = 'joaquin.rivas@liceorbl.cl';
 
@@ -279,11 +280,24 @@ app.get('/', requireAuth, (req, res) => {
   }
 
   // Non-alumno dashboard (UTP, Profesor, Inspectoría)
-  const evalsHoy = store.evaluaciones
+  let baseEvals = store.evaluaciones;
+  let baseRecs = store.recuperaciones;
+  let cursosVisibles = store.cursos;
+
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    baseEvals = store.getEvaluacionesByProfesor(req.session.user.profesor_id);
+    baseRecs = store.getRecuperacionesByProfesor(req.session.user.profesor_id);
+    const profObj = store.getProfesor(req.session.user.profesor_id);
+    if (profObj && profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
+      cursosVisibles = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
+    }
+  }
+
+  const evalsHoy = baseEvals
     .filter(e => e.fecha === hoy)
     .map(e => store.getEvaluacion(e.id));
 
-  const evalsSemana = store.evaluaciones
+  const evalsSemana = baseEvals
     .filter(e => {
       if (e.fecha < hoy) return false;
       const diff = (new Date(e.fecha) - new Date(hoy)) / (1000 * 60 * 60 * 24);
@@ -291,13 +305,13 @@ app.get('/', requireAuth, (req, res) => {
     })
     .map(e => store.getEvaluacion(e.id));
 
-  const recsPendientes = store.recuperaciones
+  const recsPendientes = baseRecs
     .filter(r => r.estado === 'pendiente')
     .map(r => store.enrichRecuperacion(r));
 
   // Count by course
-  const evalsPorCurso = store.cursos.map(c => {
-    const count = store.evaluaciones.filter(e => e.curso_id === c.id).length;
+  const evalsPorCurso = cursosVisibles.map(c => {
+    const count = baseEvals.filter(e => e.curso_id === c.id).length;
     return {
       curso_nombre: c.nombre,
       count
@@ -310,9 +324,9 @@ app.get('/', requireAuth, (req, res) => {
     evals_hoy: evalsHoy,
     evals_semana: evalsSemana,
     recuperaciones_pendientes: recsPendientes,
-    total_cursos: store.cursos.length,
+    total_cursos: cursosVisibles.length,
     evals_por_curso: evalsPorCurso,
-    total_evaluaciones_activas: store.evaluaciones.length,
+    total_evaluaciones_activas: baseEvals.length,
     total_alumnos: store.alumnos.length,
     hoy
   });
@@ -323,22 +337,59 @@ app.get('/', requireAuth, (req, res) => {
 // -------------------------------------------------------------
 app.get('/evaluaciones', requireAuth, (req, res) => {
   const { fecha_desde, fecha_hasta, curso_id, asignatura_id } = req.query;
-  let list = store.evaluaciones.map(e => store.getEvaluacion(e.id));
+  let cursosFiltro = store.cursos;
+  let asignaturasFiltro = store.asignaturas;
+  let rawList = store.evaluaciones;
+
+  // Si el usuario es un profesor, solo ve las evaluaciones de sus cursos y asignaturas asignadas
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    rawList = store.getEvaluacionesByProfesor(req.session.user.profesor_id);
+    const profObj = store.getProfesor(req.session.user.profesor_id);
+    if (profObj) {
+      if (profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
+        cursosFiltro = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
+      }
+      if (profObj.asignaturas_asignadas && profObj.asignaturas_asignadas.length > 0) {
+        asignaturasFiltro = store.asignaturas.filter(a => profObj.asignaturas_asignadas.includes(a.id));
+      }
+    }
+  }
+
+  let list = rawList.map(e => store.getEvaluacion(e.id));
+
+  // Si el usuario es un alumno, solo ve las pruebas de su curso
+  if (req.session.user.rol === 'alumno') {
+    const alumnoObj = req.session.user.alumno_id ? store.getAlumno(req.session.user.alumno_id) : null;
+    if (alumnoObj && alumnoObj.curso_id) {
+      list = list.filter(e => e.curso_id === alumnoObj.curso_id);
+    }
+  }
 
   if (fecha_desde) list = list.filter(e => e.fecha >= fecha_desde);
   if (fecha_hasta) list = list.filter(e => e.fecha <= fecha_hasta);
   if (curso_id) list = list.filter(e => e.curso_id === Number(curso_id));
   if (asignatura_id) list = list.filter(e => e.asignatura_id === Number(asignatura_id));
 
+  // Si el usuario es Inspectoría, solo debe ver evaluaciones donde existan alumnos con inasistencia
+  if (req.session.user.rol === 'inspe') {
+    list = list.filter(e => {
+      const asistenciasEv = store.getAsistenciasByEvaluacion(e.id);
+      return asistenciasEv.some(a => {
+        if (a.estado_asistencia) return a.estado_asistencia !== 'presente';
+        return !a.presente;
+      });
+    });
+  }
+
   // Sort descending by date
   list.sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   res.render('evaluaciones/listar', {
-    title: 'Evaluaciones',
+    title: req.session.user.rol === 'alumno' ? 'Mis Evaluaciones' : 'Evaluaciones',
     active: 'evaluaciones',
     evaluaciones: list,
-    cursos: store.cursos,
-    asignaturas: store.asignaturas,
+    cursos: cursosFiltro,
+    asignaturas: asignaturasFiltro,
     filtros: { fecha_desde, fecha_hasta, curso_id, asignatura_id }
   });
 });
@@ -373,11 +424,24 @@ app.get('/evaluaciones/crear', requireAuth, requireRole('profe', 'utp'), (req, r
 
   const hoy = new Date().toISOString().split('T')[0];
 
+  // Si es profesor (no UTP), filtrar sus cursos y asignaturas asignadas
+  let cursosDisponibles = store.cursos;
+  let asignaturasDisponibles = store.asignaturas;
+
+  if (user.rol === 'profe' && miProfesor) {
+    if (miProfesor.cursos_asignados && miProfesor.cursos_asignados.length > 0) {
+      cursosDisponibles = store.cursos.filter(c => miProfesor.cursos_asignados.includes(c.id));
+    }
+    if (miProfesor.asignaturas_asignadas && miProfesor.asignaturas_asignadas.length > 0) {
+      asignaturasDisponibles = store.asignaturas.filter(a => miProfesor.asignaturas_asignadas.includes(a.id));
+    }
+  }
+
   res.render('evaluaciones/crear', {
     title: 'Nueva Evaluación',
     active: 'evaluaciones',
-    cursos: store.cursos,
-    asignaturas: store.asignaturas,
+    cursos: cursosDisponibles,
+    asignaturas: asignaturasDisponibles,
     mi_profesor: miProfesor,
     hoy
   });
@@ -455,12 +519,28 @@ app.get('/evaluaciones/:id/editar', requireAuth, (req, res) => {
     return res.redirect(`/evaluaciones/${id}`);
   }
 
+  // Si es profesor, filtrar cursos y asignaturas que le pertenecen
+  let cursosDisponibles = store.cursos;
+  let asignaturasDisponibles = store.asignaturas;
+
+  if (user.rol === 'profe' && user.profesor_id) {
+    const profObj = store.getProfesor(user.profesor_id);
+    if (profObj) {
+      if (profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
+        cursosDisponibles = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
+      }
+      if (profObj.asignaturas_asignadas && profObj.asignaturas_asignadas.length > 0) {
+        asignaturasDisponibles = store.asignaturas.filter(a => profObj.asignaturas_asignadas.includes(a.id));
+      }
+    }
+  }
+
   res.render('evaluaciones/editar', {
     title: `Editar - ${ev.titulo}`,
     active: 'evaluaciones',
     ev,
-    cursos: store.cursos,
-    asignaturas: store.asignaturas
+    cursos: cursosDisponibles,
+    asignaturas: asignaturasDisponibles
   });
 });
 
@@ -533,34 +613,68 @@ app.post('/evaluaciones/:id/asistencia', requireAuth, requireRole('profe', 'utp'
   }
 
   const user = req.session.user;
-  const canJustify = ['utp', 'inspe'].includes(user.rol);
+  const isInspector = (user.rol === 'inspe');
+  const isProfesor = (user.rol === 'profe');
+  const isUtp = (user.rol === 'utp');
+
+  // Si la asistencia ya está guardada y bloqueada:
+  // Un profesor ya no puede volver a cambiar la asistencia una vez guardada.
+  if (ev.asistencia_guardada && isProfesor) {
+    req.flash('warning', 'La asistencia para esta evaluación ya fue guardada y no puede ser modificada por el profesor. Cualquier ajuste posterior corresponde a Inspectoría General.');
+    return res.redirect(`/evaluaciones/${evalId}`);
+  }
+
   const alumnos = store.getAlumnosByCurso(ev.curso_id);
 
   alumnos.forEach(alumno => {
-    // If checkbox 'alumno_{id}' is checked -> presente
-    const presente = req.body[`alumno_${alumno.id}`] !== undefined;
+    const estadoEnviado = req.body[`estado_${alumno.id}`];
     const motivo = req.body[`motivo_${alumno.id}`] || '';
-    
-    // Check justification permission
-    let justificado = false;
-    if (canJustify) {
-      justificado = req.body[`justificado_${alumno.id}`] !== undefined;
-    } else {
-      // Preserve existing justification if profesor is updating attendance
-      const existing = store.getAsistencia(alumno.id, evalId);
-      justificado = existing ? existing.justificado : false;
+    const existing = store.getAsistencia(alumno.id, evalId);
+
+    // Si inspectoría está guardando y este alumno no vino en el formulario (por ejemplo si ya estaba presente)
+    if (isInspector && !estadoEnviado) {
+      return;
     }
+
+    let estadoFinal = 'presente';
+    if (isInspector) {
+      // Inspectoría tiene atribución para justificar o registrar salida pedagógica / inasistencia
+      estadoFinal = estadoEnviado || (existing ? existing.estado_asistencia : 'injustificada');
+    } else {
+      // Si es Profesor: marca 'presente', 'injustificada' o 'salida' (salida pedagógica).
+      // Si el alumno ya contaba con 'justificado' médica por Inspectoría, se respeta
+      if (estadoEnviado === 'presente') {
+        estadoFinal = 'presente';
+      } else if (estadoEnviado === 'salida') {
+        estadoFinal = 'salida';
+      } else {
+        if (existing && existing.estado_asistencia === 'justificado') {
+          estadoFinal = 'justificado';
+        } else {
+          estadoFinal = 'injustificada';
+        }
+      }
+    }
+
+    const presente = (estadoFinal === 'presente');
+    const justificado = (estadoFinal === 'justificado' || estadoFinal === 'salida');
 
     store.guardarAsistencia({
       alumno_id: alumno.id,
       evaluacion_id: evalId,
       presente,
+      estado_asistencia: estadoFinal,
       motivo: presente ? '' : motivo,
-      justificado: presente ? false : justificado
+      justificado
     });
   });
 
-  req.flash('success', 'Registro de asistencia actualizado.');
+  // Marcar la evaluación como que ya tiene su asistencia oficial guardada
+  store.actualizarEvaluacion(evalId, { asistencia_guardada: true });
+
+  req.flash('success', isProfesor 
+    ? 'Asistencia guardada exitosamente. Ha quedado registrada y cerrada para el curso.' 
+    : 'Registro de asistencia e inasistencias actualizado correctamente.');
   res.redirect(`/evaluaciones/${evalId}`);
 });
 
@@ -570,6 +684,16 @@ app.post('/evaluaciones/:id/asistencia', requireAuth, requireRole('profe', 'utp'
 app.get('/alumnos', requireAuth, (req, res) => {
   const { busqueda, curso_id } = req.query;
   let list = [...store.alumnos];
+  let cursosList = store.cursos;
+
+  // Si el usuario es profesor, solo ve los cursos y alumnos a los que hace clases
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    const profObj = store.getProfesor(req.session.user.profesor_id);
+    if (profObj && profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
+      cursosList = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
+      list = list.filter(a => profObj.cursos_asignados.includes(a.curso_id));
+    }
+  }
 
   if (curso_id) {
     list = list.filter(a => a.curso_id === Number(curso_id));
@@ -588,7 +712,7 @@ app.get('/alumnos', requireAuth, (req, res) => {
     title: 'Alumnos',
     active: 'alumnos',
     alumnos: list,
-    cursos: store.cursos,
+    cursos: cursosList,
     filtros: { busqueda, curso_id }
   });
 });
@@ -654,6 +778,16 @@ app.get('/recuperaciones', requireAuth, (req, res) => {
   const { estado } = req.query;
   let list = [...store.recuperaciones];
 
+  // Si el usuario es profesor, solo ve las recuperaciones de las asignaturas y cursos que le corresponden
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    list = store.getRecuperacionesByProfesor(req.session.user.profesor_id);
+  }
+
+  // Si el usuario es un alumno, solo ve sus propias recuperaciones
+  if (req.session.user.rol === 'alumno' && req.session.user.alumno_id) {
+    list = list.filter(r => r.alumno_id === req.session.user.alumno_id);
+  }
+
   if (estado) {
     list = list.filter(r => r.estado === estado);
   }
@@ -673,38 +807,85 @@ app.get('/recuperaciones', requireAuth, (req, res) => {
   });
 });
 
-app.get('/recuperaciones/crear', requireAuth, requireRole('utp', 'profe', 'inspe'), (req, res) => {
+app.get('/recuperaciones/crear', requireAuth, (req, res) => {
+  // Solo Inspectoría tiene la atribución de registrar justificativos y crear recuperaciones
+  if (req.session.user.rol !== 'inspe') {
+    req.flash('warning', 'La presentación de justificativos (certificados médicos, salidas pedagógicas) y asignación de recuperaciones corresponde a Inspectoría General.');
+    return res.redirect('/recuperaciones');
+  }
+
   const hoy = new Date().toISOString().split('T')[0];
   const alumnoId = req.query.alumno_id ? Number(req.query.alumno_id) : null;
+  const evalId = req.query.evaluacion_id ? Number(req.query.evaluacion_id) : null;
+
+  // Enrich evaluations and students with related models
+  const enrichedEvals = store.evaluaciones.map(e => store.enrichEvaluacion(e));
+  const enrichedAlumnos = store.alumnos.map(a => store.getAlumno(a.id));
 
   res.render('recuperaciones/crear', {
     title: 'Nueva Recuperación',
     active: 'recuperaciones',
-    evaluaciones: store.evaluaciones,
-    alumnos: store.alumnos,
+    evaluaciones: enrichedEvals,
+    alumnos: enrichedAlumnos,
     alumno_id_preselect: alumnoId,
+    evaluacion_id_preselect: evalId,
     hoy
   });
 });
 
-app.post('/recuperaciones/crear', requireAuth, requireRole('utp', 'profe', 'inspe'), (req, res) => {
-  const { evaluacion_id, alumno_id, fecha_recuperacion, motivo } = req.body;
+app.post('/recuperaciones/crear', requireAuth, requireRole('inspe'), (req, res) => {
+  const { evaluacion_id, alumno_id, fecha_recuperacion, tipo_justificacion, motivo } = req.body;
   const aId = Number(alumno_id);
   const eId = Number(evaluacion_id);
 
-  // Determine requirement percentage (60% if justified, 70% if unjustified)
-  const asist = store.getAsistencia(aId, eId);
-  const porcentaje = (asist && asist.justificado) ? 60.0 : 70.0;
+  // Determinar exigencia según normativa institucional:
+  // - Certificado médico: 60% (misma exigencia regular)
+  // - Salida pedagógica oficial: 60% (misma exigencia regular)
+  // - Fuerza mayor autorizada: 60%
+  // - Injustificada: 70% (escala diferenciada por inasistencia sin documento)
+  let porcentaje = 60.0;
+  let justificado = true;
+  let tipoEtiqueta = 'Certificado Médico';
+
+  if (tipo_justificacion === 'salida_pedagogica') {
+    porcentaje = 60.0;
+    justificado = true;
+    tipoEtiqueta = 'Salida Pedagógica';
+  } else if (tipo_justificacion === 'fuerza_mayor') {
+    porcentaje = 60.0;
+    justificado = true;
+    tipoEtiqueta = 'Fuerza Mayor';
+  } else if (tipo_justificacion === 'injustificada') {
+    porcentaje = 70.0;
+    justificado = false;
+    tipoEtiqueta = 'Injustificada';
+  } else {
+    porcentaje = 60.0;
+    justificado = true;
+    tipoEtiqueta = 'Certificado Médico';
+  }
+
+  const motivoCompleto = motivo ? `[${tipoEtiqueta}] ${motivo}` : `[${tipoEtiqueta}]`;
+
+  // Sincronizar registro de inasistencia en la evaluación
+  store.guardarAsistencia({
+    alumno_id: aId,
+    evaluacion_id: eId,
+    presente: false,
+    motivo: motivoCompleto,
+    justificado
+  });
 
   store.crearRecuperacion({
     evaluacion_id: eId,
     alumno_id: aId,
     fecha_recuperacion,
     porcentaje_exigencia: porcentaje,
-    motivo: motivo || ''
+    tipo_justificacion: tipo_justificacion || 'medico',
+    motivo: motivoCompleto
   });
 
-  req.flash('success', `Recuperación asignada al ${porcentaje}% de exigencia.`);
+  req.flash('success', `Recuperación programada al ${porcentaje}% de exigencia (${tipoEtiqueta}).`);
   res.redirect('/recuperaciones');
 });
 
@@ -729,7 +910,15 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
   const now = new Date();
   const anio = req.query.anio ? parseInt(req.query.anio) : now.getFullYear();
   const mes = req.query.mes ? parseInt(req.query.mes) : now.getMonth() + 1;
-  const curso_id = req.query.curso_id ? Number(req.query.curso_id) : null;
+  let curso_id = req.query.curso_id ? Number(req.query.curso_id) : null;
+
+  // Si el usuario es alumno y no especificó curso, auto-asignar su curso
+  if (req.session.user.rol === 'alumno' && !curso_id) {
+    const alumnoObj = req.session.user.alumno_id ? store.getAlumnoById(req.session.user.alumno_id) : null;
+    if (alumnoObj && alumnoObj.curso_id) {
+      curso_id = alumnoObj.curso_id;
+    }
+  }
 
   const mesesNombres = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -738,17 +927,51 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
 
   const mesesList = mesesNombres.map((m, i) => ({ num: i + 1, nombre: m }));
 
-  // Filter evaluations in this month and year
-  let evals = store.evaluaciones.filter(e => {
-    const parts = e.fecha.split('-');
-    return parseInt(parts[0]) === anio && parseInt(parts[1]) === mes;
-  });
+  // Enriquecer todas las evaluaciones
+  let baseEvalsCalendario = store.evaluaciones;
+  let baseRecupsCalendario = store.recuperaciones;
+  let cursosCalendario = store.cursos;
 
-  if (curso_id) {
-    evals = evals.filter(e => e.curso_id === curso_id);
+  // Si el usuario es profesor, solo ve evaluaciones y recuperaciones de sus módulos y cursos asignados
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    baseEvalsCalendario = store.getEvaluacionesByProfesor(req.session.user.profesor_id);
+    baseRecupsCalendario = store.getRecuperacionesByProfesor(req.session.user.profesor_id);
+    const profObj = store.getProfesor(req.session.user.profesor_id);
+    if (profObj && profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
+      cursosCalendario = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
+    }
   }
 
-  // Group by day
+  const todasEvals = baseEvalsCalendario.map(e => store.enrichEvaluacion(e));
+
+  // Filtrar evaluaciones del mes y año
+  let evals = todasEvals.filter(e => {
+    if (!e.fecha) return false;
+    const parts = e.fecha.split('-');
+    const matchYearMonth = parseInt(parts[0]) === anio && parseInt(parts[1]) === mes;
+    if (!matchYearMonth) return false;
+    if (curso_id) return e.curso_id === curso_id;
+    return true;
+  });
+
+  // Enriquecer y filtrar recuperaciones del mes y año
+  const todasRecups = baseRecupsCalendario.map(r => store.enrichRecuperacion(r));
+  let recups = todasRecups.filter(r => {
+    if (!r.fecha_recuperacion) return false;
+    const parts = r.fecha_recuperacion.split('-');
+    const matchYearMonth = parseInt(parts[0]) === anio && parseInt(parts[1]) === mes;
+    if (!matchYearMonth) return false;
+    if (curso_id) {
+      const evalCursoId = r.evaluacion ? r.evaluacion.curso_id : (r.alumno ? r.alumno.curso_id : null);
+      if (evalCursoId !== curso_id) return false;
+    }
+    if (req.session.user.rol === 'alumno' && req.session.user.alumno_id) {
+      return r.alumno_id === req.session.user.alumno_id;
+    }
+    return true;
+  });
+
+  // Agrupar evaluaciones por día
   const evalsPorDia = {};
   evals.forEach(e => {
     const dia = parseInt(e.fecha.split('-')[2]);
@@ -756,12 +979,19 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
     evalsPorDia[dia].push(e);
   });
 
-  // Generate calendar weeks matrix (Monday to Sunday)
+  // Agrupar recuperaciones por día
+  const recupsPorDia = {};
+  recups.forEach(r => {
+    const dia = parseInt(r.fecha_recuperacion.split('-')[2]);
+    if (!recupsPorDia[dia]) recupsPorDia[dia] = [];
+    recupsPorDia[dia].push(r);
+  });
+
+  // Matriz de semanas (Lunes a Domingo)
   const primerDia = new Date(anio, mes - 1, 1);
   const ultimoDia = new Date(anio, mes, 0);
   const diasEnMes = ultimoDia.getDate();
 
-  // JavaScript: 0 is Sunday, 1 is Monday. Convert so 0 is Monday, 6 is Sunday
   let diaSemanaInicio = (primerDia.getDay() + 6) % 7;
 
   const semanas = [];
@@ -791,7 +1021,10 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
     meses: mesesList,
     semanas,
     evals_por_dia: evalsPorDia,
-    cursos: store.cursos,
+    recups_por_dia: recupsPorDia,
+    total_evals_mes: evals.length,
+    total_recups_mes: recups.length,
+    cursos: cursosCalendario,
     filtros: { curso_id },
     today_day: now.getDate(),
     today_month: now.getMonth() + 1,
@@ -800,7 +1033,12 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
 });
 
 app.get('/reportes/pendientes', requireAuth, (req, res) => {
-  const pendientes = store.recuperaciones.filter(r => r.estado === 'pendiente');
+  let pendientes = store.recuperaciones.filter(r => r.estado === 'pendiente');
+
+  // Si es profesor, solo ve pendientes de sus módulos/evaluaciones
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    pendientes = store.getRecuperacionesByProfesor(req.session.user.profesor_id).filter(r => r.estado === 'pendiente');
+  }
 
   // Group by evaluation id
   const agrupadas = {};
@@ -829,8 +1067,19 @@ app.get('/reportes/carga', requireAuth, (req, res) => {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  const datosCurso = store.cursos.map(c => {
-    const evalsMes = store.evaluaciones.filter(e => {
+  let cursosCarga = store.cursos;
+  let evalsBase = store.evaluaciones;
+
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    evalsBase = store.getEvaluacionesByProfesor(req.session.user.profesor_id);
+    const profObj = store.getProfesor(req.session.user.profesor_id);
+    if (profObj && profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
+      cursosCarga = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
+    }
+  }
+
+  const datosCurso = cursosCarga.map(c => {
+    const evalsMes = evalsBase.filter(e => {
       if (e.curso_id !== c.id) return false;
       const parts = e.fecha.split('-');
       return parseInt(parts[0]) === anio && parseInt(parts[1]) === mes;
@@ -917,7 +1166,9 @@ app.get('/admin/profesores', requireAuth, requireRole('utp'), (req, res) => {
   res.render('admin/profesores', {
     title: 'Profesores',
     active: 'admin',
-    data: store.profesores
+    data: store.profesores,
+    cursos: store.cursos,
+    asignaturas: store.asignaturas
   });
 });
 

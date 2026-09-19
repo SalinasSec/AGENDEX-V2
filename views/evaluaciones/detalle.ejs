@@ -7,6 +7,10 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <div>
         <h4 class="mb-1"><%= ev.titulo %></h4>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge" style="background:<%= ev.asignatura.color %>;"><%= ev.asignatura.nombre %></span>
+            <span class="text-muted small">&bull; <%= ev.curso.nombre %> (<%= ev.curso.nivel %>) &bull; Fecha: <%= ev.fecha %></span>
+        </div>
     </div>
     <div class="d-flex gap-2">
         <% if (current_user.rol === 'profe' && current_user.profesor_id == ev.profesor_id) { %>
@@ -20,102 +24,226 @@
 
 <div class="row g-4">
     <!-- Info de la evaluación -->
-    <div class="col-lg-5">
-        <div class="card h-100">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Detalles de la Evaluación</h6>
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2 text-primary"></i>Detalles de la Evaluación</h6>
             </div>
             <div class="card-body">
-                <table class="table table-borderless mb-0">
+                <table class="table table-sm table-borderless mb-0">
                     <tr>
-                        <td class="text-muted" style="width:40%;">Fecha</td>
-                        <td class="fw-semibold"><%= ev.fecha %></td>
+                        <td class="text-muted py-2" style="width:38%;">Fecha</td>
+                        <td class="fw-semibold py-2"><i class="bi bi-calendar-event me-1 text-primary"></i><%= ev.fecha %></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Hora</td>
-                        <td><%= ev.hora || 'No definida' %></td>
+                        <td class="text-muted py-2">Hora</td>
+                        <td class="py-2"><%= ev.hora || 'Horario de clase' %></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Asignatura</td>
-                        <td><span class="badge" style="background:<%= ev.asignatura.color %>;"><%= ev.asignatura.nombre %></span></td>
+                        <td class="text-muted py-2">Asignatura</td>
+                        <td class="py-2"><span class="badge" style="background:<%= ev.asignatura.color %>;"><%= ev.asignatura.nombre %></span></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Curso</td>
-                        <td><strong><%= ev.curso.nombre %></strong> (<%= ev.curso.nivel %>)</td>
+                        <td class="text-muted py-2">Curso</td>
+                        <td class="py-2"><strong><%= ev.curso.nombre %></strong> (<%= ev.curso.nivel %>)</td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Profesor</td>
-                        <td><%= ev.profesor.nombre_completo %></td>
+                        <td class="text-muted py-2">Profesor</td>
+                        <td class="py-2"><%= ev.profesor.nombre_completo %></td>
                     </tr>
                 </table>
                 <% if (ev.descripcion) { %>
-                <hr>
-                <h6>Descripción</h6>
-                <p class="text-muted mb-0"><%= ev.descripcion %></p>
+                <hr class="my-3">
+                <h6 class="fw-bold small text-muted text-uppercase mb-2">Descripción o Contenidos</h6>
+                <p class="text-muted small mb-0"><%= ev.descripcion %></p>
                 <% } %>
             </div>
         </div>
     </div>
 
-    <!-- Asistencia -->
-    <div class="col-lg-7">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Asistencia (<%= alumnos.length %> alumnos del curso)</h6>
-            </div>
-            <div class="card-body">
-                <% if (alumnos.length > 0) { %>
-                <% if (['profe','inspe','utp'].includes(current_user.rol)) { %>
-                <form method="POST" action="/evaluaciones/<%= ev.id %>/asistencia">
-                    <% if (!['inspe','utp'].includes(current_user.rol)) { %>
-                    <p class="text-muted small mb-2"><i class="bi bi-info-circle me-1"></i>Solo Inspectoría o UTP pueden marcar una ausencia como justificada.</p>
+    <!-- Asistencia y Estados -->
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h6 class="mb-0 fw-bold">
+                    <i class="bi bi-people me-2 text-primary"></i>
+                    <% if (current_user.rol === 'inspe') { %>
+                        Gestión de Inasistencias de la Evaluación
+                    <% } else { %>
+                        Control de Asistencia (<%= alumnos.length %> alumnos)
                     <% } %>
+                </h6>
+                <% if (ev.asistencia_guardada) { %>
+                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                    <i class="bi bi-lock-fill me-1"></i>Asistencia Guardada
+                </span>
+                <% } %>
+                <% if (current_user.rol === 'inspe') { %>
+                <span class="badge bg-warning text-dark"><i class="bi bi-shield-check me-1"></i>Inspectoría General</span>
+                <% } else if (current_user.rol === 'profe') { %>
+                <span class="badge bg-primary-subtle text-primary"><i class="bi bi-person-video3 me-1"></i>Profesor: Pase de Lista</span>
+                <% } %>
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <% if (alumnos.length > 0) { %>
+                
+                <% 
+                    // Determinar lista de alumnos para Inspectoría vs Profesor
+                    // Inspectoría solo debe ver a los alumnos que tienen inasistencia (no los presentes)
+                    let alumnosAfectados = alumnos;
+                    if (current_user.rol === 'inspe') {
+                        alumnosAfectados = alumnos.filter(a => {
+                            const as = asistencias[a.id];
+                            if (!as) return false;
+                            if (as.estado_asistencia) {
+                                return as.estado_asistencia !== 'presente';
+                            }
+                            return !as.presente;
+                        });
+                    }
+                %>
+
+                <% if (current_user.rol === 'inspe') { %>
+                    <!-- Panel específico de Inspectoría -->
+                    <div class="alert alert-light border border-warning-subtle small mb-3 py-2">
+                        <i class="bi bi-shield-check text-warning me-1"></i>
+                        <strong>Atribución exclusiva de Inspectoría:</strong> Se muestran únicamente los alumnos que tienen <strong>inasistencia</strong> registrada. Aquí puedes cambiar su condición a <em>Inasistencia Injustificada</em>, <em>Justificado (Médico / Fuerza Mayor)</em> o <em>Salida Pedagógica</em>.
+                    </div>
+
+                    <% if (alumnosAfectados.length === 0) { %>
+                    <div class="text-center py-4">
+                        <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>
+                        <h6 class="fw-bold mb-1">Sin inasistencias pendientes</h6>
+                        <p class="text-muted small mb-0">No se registran alumnos ausentes para esta evaluación, o todos los alumnos se encuentran presentes en sala.</p>
+                    </div>
+                    <% } else { %>
+                    <form method="POST" action="/evaluaciones/<%= ev.id %>/asistencia">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" style="min-width: 620px;">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="min-width: 170px;">Alumno Ausente</th>
+                                        <th style="min-width: 200px;">Condición de Inasistencia</th>
+                                        <th style="min-width: 180px;">Observación / Folio Médico</th>
+                                        <th class="text-center nowrap" style="min-width: 100px;">Exigencia Recup.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% alumnosAfectados.forEach(alumno => { %>
+                                    <% 
+                                        const asist = asistencias[alumno.id]; 
+                                        let estadoActual = 'injustificada';
+                                        if (asist) {
+                                            if (asist.estado_asistencia) {
+                                                estadoActual = asist.estado_asistencia;
+                                            } else if (asist.justificado) {
+                                                estadoActual = 'justificado';
+                                            } else {
+                                                estadoActual = 'injustificada';
+                                            }
+                                        }
+                                    %>
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold"><%= alumno.nombre_completo %></div>
+                                            <div class="text-muted small"><%= alumno.rut %></div>
+                                        </td>
+                                        <td>
+                                            <select name="estado_<%= alumno.id %>" class="form-select form-select-sm select-estado" data-alumno-id="<%= alumno.id %>">
+                                                <option value="injustificada" <%= estadoActual === 'injustificada' ? 'selected' : '' %>>❌ Inasistencia Injustificada</option>
+                                                <option value="justificado" <%= estadoActual === 'justificado' ? 'selected' : '' %>>🏥 Justificado (Médico / Licencia)</option>
+                                                <option value="salida" <%= estadoActual === 'salida' ? 'selected' : '' %>>🚌 Salida Pedagógica Oficial</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="text" name="motivo_<%= alumno.id %>" class="form-control form-control-sm"
+                                                   placeholder="Folio médico, certificado o motivo..."
+                                                   value="<%= (asist && asist.motivo) ? asist.motivo : '' %>"
+                                                   id="motivo_<%= alumno.id %>">
+                                        </td>
+                                        <td class="text-center" id="badge_exigencia_<%= alumno.id %>">
+                                            <% if (estadoActual === 'injustificada') { %>
+                                            <span class="badge bg-danger" title="70% de exigencia">70%</span>
+                                            <% } else if (estadoActual === 'salida') { %>
+                                            <span class="badge bg-info text-dark" title="60% regular">60%</span>
+                                            <% } else { %>
+                                            <span class="badge bg-success" title="60% regular">60%</span>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                            <small class="text-muted"><i class="bi bi-shield-check me-1"></i>Las justificaciones actualizan automáticamente el porcentaje de exigencia (60% o 70%).</small>
+                            <button type="submit" class="btn btn-warning px-4">
+                                <i class="bi bi-check-lg me-1"></i>Guardar Justificaciones
+                            </button>
+                        </div>
+                    </form>
+                    <% } %>
+
+                <% } else if (current_user.rol === 'profe') { %>
+                    <!-- Panel para Profesor -->
+                    <% if (ev.asistencia_guardada) { %>
+                    <!-- Si ya fue guardada por el profesor: no se puede cambiar después -->
+                    <div class="alert alert-success border border-success-subtle d-flex align-items-center justify-content-between py-2 px-3 mb-3">
+                        <div>
+                            <i class="bi bi-lock-fill text-success me-2"></i>
+                            <strong>Asistencia guardada y cerrada:</strong> La lista de asistencia ya fue registrada oficialmente para esta evaluación y no puede ser modificada. Si se requiere justificar a algún alumno ausente, corresponde al perfil de Inspectoría General.
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
-                        <table class="table table-hover table-sm align-middle">
+                        <table class="table table-hover align-middle mb-0" style="min-width: 620px;">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width:50px;">Asiste</th>
-                                    <th>Alumno</th>
-                                    <th>RUT</th>
-                                    <th>Motivo de ausencia</th>
-                                    <th style="width:110px;">Justificado</th>
+                                    <th style="min-width: 170px;">Alumno</th>
+                                    <th style="min-width: 190px;">Estado de Asistencia</th>
+                                    <th style="min-width: 180px;">Observación</th>
+                                    <th class="text-center nowrap" style="min-width: 100px;">Exigencia Recup.</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <% alumnos.forEach(alumno => { %>
-                                <% const asist = asistencias[alumno.id]; %>
+                                <% 
+                                    const asist = asistencias[alumno.id]; 
+                                    let estadoActual = 'presente';
+                                    if (asist) {
+                                        if (asist.estado_asistencia) {
+                                            estadoActual = asist.estado_asistencia;
+                                        } else if (asist.justificado) {
+                                            estadoActual = 'justificado';
+                                        } else if (!asist.presente) {
+                                            estadoActual = 'injustificada';
+                                        }
+                                    }
+                                %>
                                 <tr>
                                     <td>
-                                        <input type="checkbox" name="alumno_<%= alumno.id %>" class="form-check-input"
-                                               <%= (!asist || asist.presente) ? 'checked' : '' %>
-                                               onchange="toggleMotivo(this, <%= alumno.id %>)">
+                                        <div class="fw-semibold"><%= alumno.nombre_completo %></div>
+                                        <div class="text-muted small"><%= alumno.rut %></div>
                                     </td>
-                                    <td><strong><%= alumno.nombre_completo %></strong></td>
-                                    <td class="text-muted small"><%= alumno.rut %></td>
                                     <td>
-                                        <input type="text" name="motivo_<%= alumno.id %>" class="form-control form-control-sm"
-                                               placeholder="Motivo si falta..."
-                                               value="<%= (asist && asist.motivo) ? asist.motivo : '' %>"
-                                               id="motivo_<%= alumno.id %>"
-                                               <%= (!asist || asist.presente) ? 'disabled' : '' %>>
-                                    </td>
-                                    <td class="text-center">
-                                        <% if (['inspe','utp'].includes(current_user.rol)) { %>
-                                        <input type="checkbox" name="justificado_<%= alumno.id %>" class="form-check-input"
-                                               id="justificado_<%= alumno.id %>"
-                                               <%= (asist && asist.justificado) ? 'checked' : '' %>
-                                               <%= (!asist || asist.presente) ? 'disabled' : '' %>
-                                               title="Justificar ausencia (recuperación al 60%)">
+                                        <% if (estadoActual === 'presente') { %>
+                                        <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Presente</span>
+                                        <% } else if (estadoActual === 'injustificada') { %>
+                                        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Inasistencia</span>
+                                        <% } else if (estadoActual === 'salida') { %>
+                                        <span class="badge bg-info text-dark"><i class="bi bi-bus-front me-1"></i>Salida Pedagógica</span>
                                         <% } else { %>
-                                        <% if (asist && !asist.presente) { %>
-                                            <% if (asist.justificado) { %>
-                                            <span class="badge bg-success" title="Justificado por Inspectoría/UTP">Sí (60%)</span>
-                                            <% } else { %>
-                                            <span class="badge bg-danger" title="Injustificado">No (70%)</span>
-                                            <% } %>
-                                        <% } else { %>
-                                        <span class="text-muted small">-</span>
+                                        <span class="badge bg-success"><i class="bi bi-file-earmark-medical me-1"></i>Justificado</span>
                                         <% } %>
+                                    </td>
+                                    <td class="text-muted small"><%= (asist && asist.motivo) ? asist.motivo : '-' %></td>
+                                    <td class="text-center">
+                                        <% if (estadoActual === 'presente') { %>
+                                        <span class="text-muted small">&mdash;</span>
+                                        <% } else if (estadoActual === 'injustificada') { %>
+                                        <span class="badge bg-danger" title="70% de exigencia">70%</span>
+                                        <% } else { %>
+                                        <span class="badge bg-success" title="60% regular">60%</span>
                                         <% } %>
                                     </td>
                                 </tr>
@@ -123,47 +251,146 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="d-flex justify-content-end mt-3">
-                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar Asistencia</button>
+
+                    <% } else { %>
+                    <!-- Si aún no se ha guardado: El profesor pasa lista (Asistente / No Asiste / Salida Pedagógica) -->
+                    <div class="alert alert-light border border-info-subtle small mb-3 py-2">
+                        <i class="bi bi-info-circle text-primary me-1"></i>
+                        <strong>Pase de lista del profesor:</strong> Selecciona para cada estudiante si es <em>Asistente</em> o <em>No Asiste</em> (o si participa en <em>Salida Pedagógica</em>). Una vez guardada la asistencia, quedará registrada y cerrada.
                     </div>
-                </form>
+
+                    <form method="POST" action="/evaluaciones/<%= ev.id %>/asistencia">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" style="min-width: 620px;">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="min-width: 170px;">Alumno</th>
+                                        <th style="min-width: 190px;">Estado de Asistencia</th>
+                                        <th style="min-width: 180px;">Observación</th>
+                                        <th class="text-center nowrap" style="min-width: 100px;">Exigencia Recup.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% alumnos.forEach(alumno => { %>
+                                    <% 
+                                        const asist = asistencias[alumno.id]; 
+                                        let estadoActual = 'presente';
+                                        if (asist) {
+                                            if (asist.estado_asistencia) {
+                                                estadoActual = asist.estado_asistencia;
+                                            } else if (asist.justificado) {
+                                                estadoActual = 'justificado';
+                                            } else if (!asist.presente) {
+                                                estadoActual = 'injustificada';
+                                            }
+                                        }
+                                    %>
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold"><%= alumno.nombre_completo %></div>
+                                            <div class="text-muted small"><%= alumno.rut %></div>
+                                        </td>
+                                        <td>
+                                            <% if (estadoActual === 'justificado') { %>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <span class="badge bg-success py-2 px-2"><i class="bi bi-file-earmark-medical me-1"></i>Justificado (Inspectoría)</span>
+                                                <input type="hidden" name="estado_<%= alumno.id %>" value="justificado">
+                                            </div>
+                                            <% } else { %>
+                                            <select name="estado_<%= alumno.id %>" class="form-select form-select-sm select-estado" data-alumno-id="<%= alumno.id %>">
+                                                <option value="presente" <%= estadoActual === 'presente' ? 'selected' : '' %>>✅ Asistente</option>
+                                                <option value="injustificada" <%= estadoActual === 'injustificada' ? 'selected' : '' %>>❌ No Asiste</option>
+                                                <option value="salida" <%= estadoActual === 'salida' ? 'selected' : '' %>>🚌 Salida Pedagógica</option>
+                                            </select>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <input type="text" name="motivo_<%= alumno.id %>" class="form-control form-control-sm"
+                                                   placeholder="Observación..."
+                                                   value="<%= (asist && asist.motivo) ? asist.motivo : '' %>"
+                                                   id="motivo_<%= alumno.id %>"
+                                                   <%= estadoActual === 'presente' ? 'disabled' : '' %>>
+                                        </td>
+                                        <td class="text-center" id="badge_exigencia_<%= alumno.id %>">
+                                            <% if (estadoActual === 'presente') { %>
+                                            <span class="text-muted small">&mdash;</span>
+                                            <% } else if (estadoActual === 'injustificada') { %>
+                                            <span class="badge bg-danger" title="70% de exigencia">70%</span>
+                                            <% } else if (estadoActual === 'salida') { %>
+                                            <span class="badge bg-info text-dark" title="60% regular">60%</span>
+                                            <% } else { %>
+                                            <span class="badge bg-success" title="60% regular">60%</span>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                            <small class="text-muted"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Atención: Una vez guardada, la asistencia queda fija y no podrá ser cambiada por el profesor.</small>
+                            <button type="submit" class="btn btn-primary px-4" onclick="return confirm('¿Confirmas guardar la asistencia? Una vez guardada, no podrás modificarla posteriormente.')">
+                                <i class="bi bi-check-lg me-1"></i>Guardar Asistencia
+                            </button>
+                        </div>
+                    </form>
+                    <% } %>
+
                 <% } else { %>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead class="table-light">
-                            <tr><th>Alumno</th><th>RUT</th><th>Estado</th><th>Motivo</th><th>Justificado</th></tr>
-                        </thead>
-                        <tbody>
-                            <% alumnos.forEach(alumno => { %>
-                            <% const asist = asistencias[alumno.id]; %>
-                            <tr>
-                                <td><%= alumno.nombre_completo %></td>
-                                <td class="text-muted small"><%= alumno.rut %></td>
-                                <td>
-                                    <% if (asist && !asist.presente) { %>
-                                    <span class="badge bg-danger">Ausente</span>
-                                    <% } else { %>
-                                    <span class="badge bg-success">Presente</span>
-                                    <% } %>
-                                </td>
-                                <td class="text-muted small"><%= (asist && asist.motivo) ? asist.motivo : '-' %></td>
-                                <td>
-                                    <% if (asist && !asist.presente) { %>
-                                        <% if (asist.justificado) { %>
-                                        <span class="badge bg-success">Sí</span>
+                    <!-- Vista de solo lectura (UTP, Alumnos, Apoderados) -->
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Alumno</th>
+                                    <th>RUT</th>
+                                    <th>Estado</th>
+                                    <th>Observación</th>
+                                    <th class="text-center">Exigencia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% alumnos.forEach(alumno => { %>
+                                <% 
+                                    const asist = asistencias[alumno.id];
+                                    let est = 'presente';
+                                    if (asist) {
+                                        if (asist.estado_asistencia) est = asist.estado_asistencia;
+                                        else if (asist.justificado) est = 'justificado';
+                                        else if (!asist.presente) est = 'injustificada';
+                                    }
+                                %>
+                                <tr>
+                                    <td><strong><%= alumno.nombre_completo %></strong></td>
+                                    <td class="text-muted small"><%= alumno.rut %></td>
+                                    <td>
+                                        <% if (est === 'presente') { %>
+                                        <span class="badge bg-success">Presente</span>
+                                        <% } else if (est === 'injustificada') { %>
+                                        <span class="badge bg-danger">Inasistencia Sin Justificar</span>
+                                        <% } else if (est === 'salida') { %>
+                                        <span class="badge bg-info text-dark">Salida Pedagógica</span>
                                         <% } else { %>
-                                        <span class="badge bg-secondary">No</span>
+                                        <span class="badge bg-success">Justificado</span>
                                         <% } %>
-                                    <% } else { %>
-                                    <span class="text-muted small">-</span>
-                                    <% } %>
-                                </td>
-                            </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
+                                    </td>
+                                    <td class="text-muted small"><%= (asist && asist.motivo) ? asist.motivo : '-' %></td>
+                                    <td class="text-center">
+                                        <% if (est === 'presente') { %>
+                                        <span class="text-muted">&mdash;</span>
+                                        <% } else if (est === 'injustificada') { %>
+                                        <span class="badge bg-danger">70%</span>
+                                        <% } else { %>
+                                        <span class="badge bg-success">60%</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
                 <% } %>
+
                 <% } else { %>
                 <p class="text-muted text-center py-4">No hay alumnos registrados en este curso.</p>
                 <% } %>
@@ -175,17 +402,37 @@
 <%- include('../partials/footer', {
     scripts: `
 <script>
-function toggleMotivo(checkbox, alumnoId) {
-    const motivoInput = document.getElementById('motivo_' + alumnoId);
-    motivoInput.disabled = checkbox.checked;
-    if (checkbox.checked) motivoInput.value = '';
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.select-estado').forEach(sel => {
+        sel.addEventListener('change', function() {
+            const alumnoId = this.getAttribute('data-alumno-id');
+            const motivoInput = document.getElementById('motivo_' + alumnoId);
+            const badgeContainer = document.getElementById('badge_exigencia_' + alumnoId);
+            const val = this.value;
 
-    const justificadoInput = document.getElementById('justificado_' + alumnoId);
-    if (justificadoInput) {
-        justificadoInput.disabled = checkbox.checked;
-        if (checkbox.checked) justificadoInput.checked = false;
-    }
-}
+            if (val === 'presente') {
+                if (motivoInput) {
+                    motivoInput.disabled = true;
+                    motivoInput.value = '';
+                }
+                if (badgeContainer) badgeContainer.innerHTML = '<span class="text-muted small">&mdash;</span>';
+            } else {
+                if (motivoInput) {
+                    motivoInput.disabled = false;
+                }
+                if (badgeContainer) {
+                    if (val === 'injustificada') {
+                        badgeContainer.innerHTML = '<span class="badge bg-danger" title="70% de exigencia">70%</span>';
+                    } else if (val === 'salida') {
+                        badgeContainer.innerHTML = '<span class="badge bg-info text-dark" title="60% regular">60%</span>';
+                    } else {
+                        badgeContainer.innerHTML = '<span class="badge bg-success" title="60% regular">60%</span>';
+                    }
+                }
+            }
+        });
+    });
+});
 </script>
 `
 }) %>

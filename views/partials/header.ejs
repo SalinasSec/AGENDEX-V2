@@ -27,22 +27,31 @@
                     </a>
                 </li>
 
-                <% if (current_user && current_user.rol !== 'alumno') { %>
-                <li class="nav-section">GESTIONES</li>
-                <% if (current_user.rol === 'profe') { %>
+                <!-- Navegación principal -->
+                <% if (current_user && current_user.rol === 'alumno') { %>
+                <li class="nav-section">MIS ACTIVIDADES</li>
+                <li>
+                    <a href="/evaluaciones" class="<%= (typeof active !== 'undefined' && active === 'evaluaciones') ? 'active' : '' %>">
+                        <i class="bi bi-clipboard-check"></i><span>Mis Evaluaciones</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/recuperaciones" class="<%= (typeof active !== 'undefined' && active === 'recuperaciones') ? 'active' : '' %>">
+                        <i class="bi bi-arrow-counterclockwise"></i><span>Mis Recuperaciones</span>
+                    </a>
+                </li>
+                <% } else if (current_user) { %>
+                <li class="nav-section">GESTIÓN ACADÉMICA</li>
                 <li>
                     <a href="/evaluaciones" class="<%= (typeof active !== 'undefined' && active === 'evaluaciones') ? 'active' : '' %>">
                         <i class="bi bi-clipboard-check"></i><span>Evaluaciones</span>
                     </a>
                 </li>
-                <% } %>
-                <% if (['utp','profe','inspe'].includes(current_user.rol)) { %>
                 <li>
                     <a href="/alumnos" class="<%= (typeof active !== 'undefined' && active === 'alumnos') ? 'active' : '' %>">
                         <i class="bi bi-people"></i><span>Alumnos</span>
                     </a>
                 </li>
-                <% } %>
                 <li>
                     <a href="/recuperaciones" class="<%= (typeof active !== 'undefined' && active === 'recuperaciones') ? 'active' : '' %>">
                         <i class="bi bi-arrow-counterclockwise"></i><span>Recuperaciones</span>
@@ -50,10 +59,10 @@
                 </li>
                 <% } %>
 
-                <li class="nav-section">REPORTES</li>
+                <li class="nav-section">CALENDARIO & REPORTES</li>
                 <li>
                     <a href="/reportes/calendario" class="<%= (typeof active !== 'undefined' && active === 'calendario') ? 'active' : '' %>">
-                        <i class="bi bi-calendar3"></i><span>Calendario</span>
+                        <i class="bi bi-calendar3"></i><span>Calendario Escolar</span>
                     </a>
                 </li>
                 <% if (current_user && current_user.rol !== 'alumno') { %>
@@ -70,10 +79,15 @@
                 <% } %>
 
                 <% if (current_user && current_user.rol === 'utp') { %>
-                <li class="nav-section">ADMINISTRACIÓN</li>
+                <li class="nav-section">ADMINISTRACIÓN UTP</li>
+                <li>
+                    <a href="/admin/profesores" class="<%= (typeof active !== 'undefined' && active === 'profesores') ? 'active' : '' %>">
+                        <i class="bi bi-person-badge"></i><span>Gestión de Profesores</span>
+                    </a>
+                </li>
                 <li>
                     <a href="/admin" class="<%= (typeof active !== 'undefined' && active === 'admin') ? 'active' : '' %>">
-                        <i class="bi bi-gear"></i><span>Configuración</span>
+                        <i class="bi bi-gear"></i><span>Configuración General</span>
                     </a>
                 </li>
                 <% } %>

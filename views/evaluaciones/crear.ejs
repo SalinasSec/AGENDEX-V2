@@ -46,7 +46,12 @@
                         <div class="col-md-6">
                             <label class="form-label">Profesor</label>
                             <input type="text" class="form-control" value="<%= mi_profesor.nombre_completo %>" disabled>
-                            <div class="form-text">La evaluación queda registrada a tu nombre.</div>
+                            <div class="form-text">
+                                <% if (mi_profesor.cargo_extra) { %>
+                                    <span class="badge bg-primary-subtle text-primary me-1"><%= mi_profesor.cargo_extra %></span>
+                                <% } %>
+                                Evaluación registrada a tu nombre con tus cursos y módulos asignados.
+                            </div>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Descripción</label>

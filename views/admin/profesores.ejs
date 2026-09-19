@@ -39,13 +39,49 @@
                 <div class="table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
-                            <tr><th>Nombre</th><th>Apellido</th><th>Email</th><th class="text-end">Acciones</th></tr>
+                            <tr>
+                                <th>Docente</th>
+                                <th>Materia / Módulo</th>
+                                <th>Cursos Asignados</th>
+                                <th>Email</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
                         </thead>
                         <tbody>
                             <% data.forEach(p => { %>
                             <tr>
-                                <td class="fw-semibold"><%= p.nombre %></td>
-                                <td><%= p.apellido %></td>
+                                <td>
+                                    <div class="fw-semibold"><%= p.nombre %> <%= p.apellido %></div>
+                                    <% if (p.es_jefatura) { %>
+                                        <span class="badge bg-primary text-white small" style="font-size: 0.72rem;">
+                                            <i class="bi bi-star-fill me-1"></i><%= p.cargo_extra %>
+                                        </span>
+                                    <% } else if (p.cargo_extra) { %>
+                                        <span class="badge bg-light text-secondary border small" style="font-size: 0.72rem;">
+                                            <%= p.cargo_extra %>
+                                        </span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border"><%= p.materia || 'General' %></span>
+                                </td>
+                                <td>
+                                    <% if (p.cursos_asignados && p.cursos_asignados.length > 0) { %>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <% p.cursos_asignados.forEach(cId => { 
+                                                const cur = cursos.find(c => c.id === cId);
+                                                if (cur) {
+                                            %>
+                                                <span class="badge bg-secondary-subtle text-secondary border" style="font-size: 0.75rem;">
+                                                    <%= cur.nombre %>
+                                                </span>
+                                            <%  } 
+                                            }) %>
+                                        </div>
+                                    <% } else { %>
+                                        <span class="text-muted small">Todos los cursos</span>
+                                    <% } %>
+                                </td>
                                 <td class="text-muted small"><%= p.email || '-' %></td>
                                 <td class="text-end">
                                     <form method="POST" action="/admin/profesores/<%= p.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar al profesor <%= p.nombre %> <%= p.apellido %>?')">

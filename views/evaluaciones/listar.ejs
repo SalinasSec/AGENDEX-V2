@@ -5,7 +5,15 @@
 }) %>
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <h4 class="mb-0"><i class="bi bi-clipboard-check me-2 text-primary"></i>Evaluaciones</h4>
+    <div>
+        <h4 class="mb-0">
+            <i class="bi bi-clipboard-check me-2 text-primary"></i>
+            <%= current_user.rol === 'inspe' ? 'Evaluaciones con Inasistencias' : 'Evaluaciones' %>
+        </h4>
+        <% if (current_user.rol === 'inspe') { %>
+        <small class="text-muted">Mostrando únicamente las evaluaciones con estudiantes en condición de inasistencia</small>
+        <% } %>
+    </div>
     <% if (current_user.rol === 'profe') { %>
     <a href="/evaluaciones/crear" class="btn btn-primary">
         <i class="bi bi-plus-circle me-1"></i>Nueva Evaluación
