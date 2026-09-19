@@ -683,7 +683,7 @@ app.post('/evaluaciones/:id/asistencia', requireAuth, requireRole('profe', 'utp'
 // -------------------------------------------------------------
 app.get('/alumnos', requireAuth, (req, res) => {
   const { busqueda, curso_id } = req.query;
-  let list = [...store.alumnos];
+  let list = store.alumnos.map(a => store.getAlumno(a.id));
   let cursosList = store.cursos;
 
   // Si el usuario es profesor, solo ve los cursos y alumnos a los que hace clases

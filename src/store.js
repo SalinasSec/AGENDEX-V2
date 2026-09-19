@@ -163,6 +163,10 @@ class Store {
       { id: 5, rut: "20.555.666-7", nombre: "Matías", apellido: "González", curso_id: 1 },
       { id: 6, rut: "19.888.999-0", nombre: "Antonia", apellido: "Sepúlveda", curso_id: 12 },
     ];
+    this.alumnos.forEach(a => {
+      a.nombre_completo = `${a.nombre} ${a.apellido}`;
+      a.curso = this.getCurso(a.curso_id);
+    });
     this.alumnoIdSeq = 7;
 
     // Usuarios con credenciales institucionales
