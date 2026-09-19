@@ -30,7 +30,7 @@
 
                 {% if current_user and current_user.rol != 'alumno' %}
                 <li class="nav-section">GESTIONES</li>
-                {% if current_user.rol == 'profe' %}
+                {% if current_user.rol in ['utp', 'profe', 'inspe'] %}
                 <li>
                     <a href="/evaluaciones" class="{{ 'active' if active == 'evaluaciones' else '' }}">
                         <i class="bi bi-clipboard-check"></i><span>Evaluaciones</span>

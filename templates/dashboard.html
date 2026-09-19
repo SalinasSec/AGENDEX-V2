@@ -188,17 +188,17 @@
             <div class="card-body">
                 {% if recuperaciones_pendientes|length > 0 %}
                 <div class="list-group list-group-flush mb-3">
-                    <% recuperaciones_pendientes.slice(0, 4).forEach(rec => { %>
+                    {% for rec in recuperaciones_pendientes[:4] %}
                     <div class="list-group-item px-0">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <strong class="small">{{ rec.alumno ? rec.alumno.nombre_completo : 'Alumno' }}</strong>
-                                <br><small class="text-muted">{{ rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' }}</small>
+                                <strong class="small">{{ rec.alumno.nombre_completo if rec.alumno else 'Alumno' }}</strong>
+                                <br><small class="text-muted">{{ rec.evaluacion.titulo if rec.evaluacion else 'Evaluación' }}</small>
                             </div>
                             <span class="badge bg-warning text-dark">{{ rec.fecha_recuperacion }}</span>
                         </div>
                     </div>
-                    <% }) %>
+                    {% endfor %}
                 </div>
                 <div class="text-center">
                     <a href="/recuperaciones" class="btn btn-sm btn-outline-danger">Ver todas</a>

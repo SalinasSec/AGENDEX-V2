@@ -262,6 +262,16 @@ def listar_evaluaciones():
         cursor.execute(query, params)
         evaluaciones = cursor.fetchall()
 
+        # Si el usuario es Inspectoría, filtrar únicamente evaluaciones con inasistencias registradas
+        if session['user']['rol'] == 'inspe':
+            cursor.execute("""
+                SELECT DISTINCT evaluacion_id 
+                FROM asistencia_evaluaciones 
+                WHERE (estado_asistencia != 'presente' AND estado_asistencia IS NOT NULL) OR presente = 0
+            """)
+            eval_ids_con_inasistencias = {row['evaluacion_id'] for row in cursor.fetchall()}
+            evaluaciones = [e for e in evaluaciones if e['id'] in eval_ids_con_inasistencias]
+
         for ev in evaluaciones:
             ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
             ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
@@ -270,7 +280,7 @@ def listar_evaluaciones():
     conn.close()
     return render_template(
         'evaluaciones/listar.html',
-        title='Gestión de Evaluaciones',
+        title='Evaluaciones con Inasistencias' if session['user']['rol'] == 'inspe' else 'Gestión de Evaluaciones',
         active='evaluaciones',
         evaluaciones=evaluaciones,
         cursos=cursos,
@@ -339,7 +349,7 @@ def detalle_evaluacion(eval_id):
     with conn.cursor() as cursor:
         cursor.execute("""
             SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color,
-                   p.nombre AS profe_nombre, p.apellido AS profe_apellido, c.nombre AS curso_nombre
+                   p.nombre AS profe_nombre, p.apellido AS profe_apellido, c.nombre AS curso_nombre, c.nivel AS curso_nivel
             FROM evaluaciones e
             JOIN asignaturas a ON e.asignatura_id = a.id
             JOIN profesores p ON e.profesor_id = p.id
@@ -355,27 +365,53 @@ def detalle_evaluacion(eval_id):
 
         ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
         ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
-        ev['curso'] = {'nombre': ev['curso_nombre']}
+        ev['curso'] = {'nombre': ev['curso_nombre'], 'nivel': ev.get('curso_nivel', 'Media')}
 
-        # Asistencia
+        # Alumnos del curso
         cursor.execute("""
-            SELECT ae.*, al.nombre AS alumno_nombre, al.apellido AS alumno_apellido, al.rut AS alumno_rut
-            FROM asistencia_evaluaciones ae
-            JOIN alumnos al ON ae.alumno_id = al.id
-            WHERE ae.evaluacion_id = %s
+            SELECT id, rut, nombre, apellido, CONCAT(nombre, ' ', apellido) as nombre_completo
+            FROM alumnos
+            WHERE curso_id = %s
+            ORDER BY apellido ASC, nombre ASC
+        """, (ev['curso_id'],))
+        alumnos = cursor.fetchall()
+
+        # Asistencia registrada
+        cursor.execute("""
+            SELECT * FROM asistencia_evaluaciones
+            WHERE evaluacion_id = %s
         """, (eval_id,))
-        asistencias = cursor.fetchall()
+        asistencias_raw = cursor.fetchall()
+        asistencias_map = {}
+        for a in asistencias_raw:
+            asistencias_map[a['alumno_id']] = {
+                'presente': a.get('presente', 1),
+                'justificado': a.get('justificado', 0),
+                'estado_asistencia': a.get('estado_asistencia') or ('justificado' if a.get('justificado') else ('presente' if a.get('presente') else 'injustificada')),
+                'motivo': a.get('motivo_inasistencia') or ''
+            }
+
+        # Para Inspectoría: filtrar solo los alumnos con inasistencia
+        alumnos_afectados = alumnos
+        if session['user']['rol'] == 'inspe':
+            alumnos_afectados = [
+                a for a in alumnos
+                if a['id'] in asistencias_map and asistencias_map[a['id']]['estado_asistencia'] != 'presente'
+            ]
 
     conn.close()
     return render_template(
         'evaluaciones/detalle.html',
         title=ev['titulo'],
         active='evaluaciones',
+        ev=ev,
         evaluacion=ev,
-        asistencias=asistencias
+        alumnos=alumnos,
+        alumnos_afectados=alumnos_afectados,
+        asistencias=asistencias_map
     )
 
-@app.route('/evaluaciones/<int:eval_id>/asistencia', methods=['GET', 'POST'])
+@app.route('/evaluaciones/<int:eval_id>/asistencia', methods=['POST'])
 @login_required
 @role_required('profe', 'inspe', 'utp')
 def asistencia_evaluacion(eval_id):
@@ -388,44 +424,68 @@ def asistencia_evaluacion(eval_id):
             flash('Evaluación no encontrada.', 'danger')
             return redirect(url_for('listar_evaluaciones'))
 
-        if request.method == 'POST':
-            cursor.execute("SELECT id FROM alumnos WHERE curso_id = %s", (ev['curso_id'],))
-            alumnos = cursor.fetchall()
+        user_rol = session['user']['rol']
 
-            for a in alumnos:
-                aid = a['id']
-                presente = 1 if request.form.get(f'alumno_{aid}') == 'on' else 0
-                justificado = 1 if request.form.get(f'justificado_{aid}') == 'on' else 0
-                motivo = request.form.get(f'motivo_{aid}', '').strip() if not presente else None
-
-                cursor.execute("""
-                    INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, presente, justificado, motivo_inasistencia)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                    presente=VALUES(presente), justificado=VALUES(justificado), motivo_inasistencia=VALUES(motivo_inasistencia)
-                """, (eval_id, aid, presente, justificado, motivo))
-
+        # Si el profesor intenta modificar una lista ya guardada, se bloquea
+        if user_rol == 'profe' and ev.get('asistencia_guardada'):
             conn.close()
-            flash('Asistencia guardada correctamente.', 'success')
+            flash('La asistencia ya fue registrada y cerrada oficialmente. Las modificaciones corresponden a Inspectoría.', 'warning')
             return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
 
-        cursor.execute("""
-            SELECT al.*, ae.presente, ae.justificado, ae.motivo_inasistencia
-            FROM alumnos al
-            LEFT JOIN asistencia_evaluaciones ae ON al.id = ae.alumno_id AND ae.evaluacion_id = %s
-            WHERE al.curso_id = %s
-            ORDER BY al.apellido ASC, al.nombre ASC
-        """, (eval_id, ev['curso_id']))
-        alumnos_asistencia = cursor.fetchall()
+        cursor.execute("SELECT id FROM alumnos WHERE curso_id = %s", (ev['curso_id'],))
+        alumnos = cursor.fetchall()
+
+        for a in alumnos:
+            aid = a['id']
+            estado_enviado = request.form.get(f'estado_{aid}')
+            motivo_enviado = request.form.get(f'motivo_{aid}', '').strip()
+
+            cursor.execute("SELECT * FROM asistencia_evaluaciones WHERE evaluacion_id = %s AND alumno_id = %s", (eval_id, aid))
+            existing = cursor.fetchone()
+
+            estado_final = 'presente'
+            if user_rol == 'inspe':
+                if estado_enviado:
+                    estado_final = estado_enviado
+                elif existing and existing.get('estado_asistencia'):
+                    estado_final = existing['estado_asistencia']
+                else:
+                    estado_final = 'injustificada'
+            else:
+                # Profesor
+                if estado_enviado == 'presente':
+                    estado_final = 'presente'
+                elif estado_enviado == 'salida':
+                    estado_final = 'salida'
+                else:
+                    if existing and existing.get('estado_asistencia') == 'justificado':
+                        estado_final = 'justificado'
+                    else:
+                        estado_final = 'injustificada'
+
+            presente = 1 if estado_final == 'presente' else 0
+            justificado = 1 if estado_final in ('justificado', 'salida') else 0
+            motivo = motivo_enviado if estado_final != 'presente' else None
+
+            cursor.execute("""
+                INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, estado_asistencia, presente, justificado, motivo_inasistencia)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                estado_asistencia=VALUES(estado_asistencia),
+                presente=VALUES(presente),
+                justificado=VALUES(justificado),
+                motivo_inasistencia=VALUES(motivo_inasistencia)
+            """, (eval_id, aid, estado_final, presente, justificado, motivo))
+
+        # Si el profesor guarda, se marca la evaluación como asistencia cerrada
+        if user_rol == 'profe':
+            cursor.execute("UPDATE evaluaciones SET asistencia_guardada = 1 WHERE id = %s", (eval_id,))
+
+        conn.commit()
 
     conn.close()
-    return render_template(
-        'evaluaciones/asistencia.html',
-        title=f"Asistencia · {ev['titulo']}",
-        active='evaluaciones',
-        evaluacion=ev,
-        alumnos=alumnos_asistencia
-    )
+    flash('Asistencia actualizada correctamente.', 'success')
+    return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
 
 @app.route('/evaluaciones/api/disponibilidad')
 @login_required
