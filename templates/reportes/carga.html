@@ -7,12 +7,6 @@
     <span class="text-muted">Mes: {{ mes_nombre }} {{ anio }}</span>
 </div>
 
-<% 
-    const all_evals = datos_curso.map(d => d.evals_mes);
-    const max_evals = Math.max(...all_evals, 1);
-    const total_evals = all_evals.reduce((a, b) => a + b, 0);
-%>
-
 <div class="row g-4">
     <!-- Gráfico de barras por curso -->
     <div class="col-lg-7">
@@ -30,9 +24,9 @@
                             <td>
                                 <div class="d-flex align-items-center">
                                     <div class="progress flex-grow-1" style="height:28px;">
-                                        <% const pct = Math.round((d.evals_mes / max_evals) * 100); %>
-                                        <div class="progress-bar {{ d.evals_mes >= 8 ? 'bg-danger' : (d.evals_mes >= 5 ? 'bg-warning text-dark' : 'bg-success') }}" 
-                                             style="width: {{ Math.max(pct, 8) }}%;">
+                                        {% set pct = ((d.evals_mes / (max_evals if max_evals > 0 else 1)) * 100)|round|int %}
+                                        <div class="progress-bar {% if d.evals_mes >= 8 %}bg-danger{% elif d.evals_mes >= 5 %}bg-warning text-dark{% else %}bg-success{% endif %}" 
+                                             style="width: {{ [pct, 8]|max }}%;">
                                             {{ d.evals_mes }} evals
                                         </div>
                                     </div>
@@ -49,7 +43,7 @@
                                 {% endif %}
                             </td>
                         </tr>
-                        <% }) %>
+                        {% endfor %}
                     </tbody>
                 </table>
                 {% else %}

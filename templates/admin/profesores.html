@@ -44,14 +44,14 @@
                             <tr>
                                 <td class="fw-semibold">{{ p.nombre }}</td>
                                 <td>{{ p.apellido }}</td>
-                                <td class="text-muted small">{{ p.email || '-' }}</td>
+                                <td class="text-muted small">{{ p.email if p.email else '-' }}</td>
                                 <td class="text-end">
                                     <form method="POST" action="/admin/profesores/{{ p.id }}/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar al profesor {{ p.nombre }} {{ p.apellido }}?')">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
                                     </form>
                                 </td>
                             </tr>
-                            <% }) %>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>

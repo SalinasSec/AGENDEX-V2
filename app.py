@@ -5,6 +5,7 @@ Backend en Flask con Base de Datos MySQL
 """
 
 import os
+import calendar
 from datetime import datetime, date, timedelta
 from functools import wraps
 from flask import (
@@ -209,6 +210,15 @@ def index():
             r['alumno'] = {'nombre': r['alumno_nombre'], 'apellido': r['alumno_apellido'], 'nombre_completo': f"{r['alumno_nombre']} {r['alumno_apellido']}"}
             r['curso'] = {'nombre': r['curso_nombre']}
 
+        cursor.execute("""
+            SELECT c.nombre AS curso_nombre, COUNT(e.id) AS count
+            FROM cursos c
+            LEFT JOIN evaluaciones e ON c.id = e.curso_id
+            GROUP BY c.id, c.nombre
+            ORDER BY count DESC
+        """)
+        evals_por_curso = cursor.fetchall()
+
     conn.close()
 
     evals_hoy = [e for e in todas_evals if str(e['fecha']) == hoy]
@@ -222,7 +232,8 @@ def index():
         evals_semana=evals_semana,
         recuperaciones_pendientes=recuperaciones_pendientes,
         total_cursos=total_cursos,
-        total_alumnos=total_alumnos
+        total_alumnos=total_alumnos,
+        evals_por_curso=evals_por_curso
     )
 
 # -------------------------------------------------------------
@@ -688,26 +699,74 @@ def perfil_alumno(alumno_id):
 @app.route('/reportes/calendario')
 @login_required
 def reporte_calendario():
+    today = date.today()
+    mes = request.args.get('mes', type=int) or today.month
+    anio = request.args.get('anio', type=int) or today.year
+    curso_id = request.args.get('curso_id', type=int)
+
+    user = session.get('user', {})
+    if user.get('rol') == 'alumno' and not curso_id and user.get('alumno_id'):
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT curso_id FROM alumnos WHERE id = %s", (user['alumno_id'],))
+            row = cursor.fetchone()
+            if row:
+                curso_id = row['curso_id']
+        conn.close()
+
+    meses_nombres = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ]
+    meses_list = [{'num': i + 1, 'nombre': m} for i, m in enumerate(meses_nombres)]
+
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+        cursos = cursor.fetchall()
+
+        query = """
             SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color, c.nombre AS curso_nombre
             FROM evaluaciones e
             JOIN asignaturas a ON e.asignatura_id = a.id
             JOIN cursos c ON e.curso_id = c.id
-            ORDER BY e.fecha ASC
-        """)
-        evaluaciones = cursor.fetchall()
-        for ev in evaluaciones:
-            ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
-            ev['curso'] = {'nombre': ev['curso_nombre']}
+            WHERE YEAR(e.fecha) = %s AND MONTH(e.fecha) = %s
+        """
+        params = [anio, mes]
+        if curso_id:
+            query += " AND e.curso_id = %s"
+            params.append(curso_id)
+        query += " ORDER BY e.fecha ASC, e.hora ASC"
+        cursor.execute(query, params)
+        evals = cursor.fetchall()
     conn.close()
+
+    evals_por_dia = {}
+    for ev in evals:
+        ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
+        ev['curso'] = {'nombre': ev['curso_nombre']}
+        dia_num = ev['fecha'].day if hasattr(ev['fecha'], 'day') else int(str(ev['fecha']).split('-')[2])
+        if dia_num not in evals_por_dia:
+            evals_por_dia[dia_num] = []
+        evals_por_dia[dia_num].append(ev)
+
+    semanas = calendar.monthcalendar(anio, mes)
 
     return render_template(
         'reportes/calendario.html',
-        title='Calendario Mensual',
+        title='Calendario de Evaluaciones',
         active='calendario',
-        evaluaciones=evaluaciones
+        mes=mes,
+        anio=anio,
+        mes_nombre=meses_nombres[mes - 1],
+        meses=meses_list,
+        semanas=semanas,
+        evals_por_dia=evals_por_dia,
+        cursos=cursos,
+        filtros={'curso_id': curso_id},
+        today_day=today.day,
+        today_month=today.month,
+        today_year=today.year
     )
 
 @app.route('/reportes/pendientes')
@@ -742,23 +801,55 @@ def reporte_pendientes():
 @app.route('/reportes/carga')
 @login_required
 def reporte_carga():
+    today = date.today()
+    anio = today.year
+    mes = today.month
+    meses_nombres = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ]
+
     conn = get_db_connection()
     with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+        cursos = cursor.fetchall()
+
         cursor.execute("""
-            SELECT c.nombre AS curso_nombre, COUNT(e.id) AS total_evaluaciones
-            FROM cursos c
-            LEFT JOIN evaluaciones e ON c.id = e.curso_id
-            GROUP BY c.id, c.nombre
-            ORDER BY total_evaluaciones DESC
+            SELECT curso_id, COUNT(*) AS count
+            FROM evaluaciones
+            WHERE YEAR(fecha) = %s AND MONTH(fecha) = %s
+            GROUP BY curso_id
+        """, (anio, mes))
+        evals_map = {row['curso_id']: row['count'] for row in cursor.fetchall()}
+
+        cursor.execute("""
+            SELECT curso_id, COUNT(*) AS count
+            FROM alumnos
+            GROUP BY curso_id
         """)
-        carga = cursor.fetchall()
+        alumnos_map = {row['curso_id']: row['count'] for row in cursor.fetchall()}
     conn.close()
+
+    datos_curso = []
+    for c in cursos:
+        datos_curso.append({
+            'curso': c,
+            'evals_mes': evals_map.get(c['id'], 0),
+            'alumnos': alumnos_map.get(c['id'], 0)
+        })
+
+    total_evals = sum(d['evals_mes'] for d in datos_curso)
+    max_evals = max([d['evals_mes'] for d in datos_curso] + [1])
 
     return render_template(
         'reportes/carga.html',
-        title='Distribución de Carga Académica',
+        title='Carga Académica',
         active='carga',
-        carga=carga
+        mes_nombre=meses_nombres[mes - 1],
+        anio=anio,
+        datos_curso=datos_curso,
+        total_evals=total_evals,
+        max_evals=max_evals
     )
 
 # -------------------------------------------------------------

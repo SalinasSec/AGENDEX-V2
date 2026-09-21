@@ -28,7 +28,7 @@
                             <option value="">Selecciona un curso...</option>
                             {% for c in cursos %}
                             <option value="{{ c.id }}">{{ c.nombre }} ({{ c.nivel }})</option>
-                            <% }) %>
+                            {% endfor %}
                         </select>
                     </div>
                     <hr>

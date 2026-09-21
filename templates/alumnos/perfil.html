@@ -5,7 +5,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <div>
         <h4 class="mb-1">{{ alumno.nombre_completo }}</h4>
-        <span class="badge bg-secondary">{{ alumno.curso ? alumno.curso.nombre : 'Sin curso' }}</span>
+        <span class="badge bg-secondary">{{ alumno.curso.nombre if alumno.curso else (alumno.curso_nombre if alumno.curso_nombre else 'Sin curso') }}</span>
         <span class="text-muted ms-2">{{ alumno.rut }}</span>
     </div>
 </div>
@@ -33,7 +33,7 @@
         <div class="stat-card">
             <div class="stat-icon" style="background:#fef7e0;color:#b05a00;"><i class="bi bi-arrow-counterclockwise"></i></div>
             <div>
-                <div class="stat-number">{{ recuperaciones.filter(r => r.estado === 'pendiente')|length }}</div>
+                <div class="stat-number">{{ recuperaciones | selectattr('estado', 'equalto', 'pendiente') | list | length }}</div>
                 <div class="stat-label">Recuperaciones pendientes</div>
             </div>
         </div>
@@ -42,7 +42,7 @@
         <div class="stat-card">
             <div class="stat-icon" style="background:#e6f4ea;color:#137333;"><i class="bi bi-check-circle"></i></div>
             <div>
-                <div class="stat-number">{{ recuperaciones.filter(r => r.estado === 'completada')|length }}</div>
+                <div class="stat-number">{{ recuperaciones | selectattr('estado', 'equalto', 'completada') | list | length }}</div>
                 <div class="stat-label">Recuperaciones completadas</div>
             </div>
         </div>
@@ -85,9 +85,9 @@
                                     <span class="badge bg-danger">Ausente</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-muted small">{{ item.asistencia.motivo || '-' }}</td>
+                                <td class="text-muted small">{{ item.asistencia.motivo if item.asistencia.motivo else '-' }}</td>
                                 <td>
-                                    {% if !item.asistencia.presente %}
+                                    {% if not item.asistencia.presente %}
                                         {% if item.asistencia.justificado %}
                                         <span class="badge bg-success">Sí (60%)</span>
                                         {% else %}
@@ -98,7 +98,7 @@
                                     {% endif %}
                                 </td>
                             </tr>
-                            <% }) %>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -114,7 +114,7 @@
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="bi bi-arrow-counterclockwise me-2"></i>Recuperaciones</h6>
-                {% if ['utp','profe','inspe'].includes(current_user.rol) %}
+                {% if current_user.rol in ['utp','profe','inspe'] %}
                 <a href="/recuperaciones/crear?alumno_id={{ alumno.id }}" class="btn btn-sm btn-outline-primary">Asignar</a>
                 {% endif %}
             </div>
@@ -125,25 +125,25 @@
                     <div class="list-group-item px-0">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <strong class="small">{{ rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' }}</strong>
+                                <strong class="small">{{ rec.eval_titulo if rec.eval_titulo else (rec.evaluacion.titulo if rec.evaluacion else 'Evaluación') }}</strong>
                                 <br><small class="text-muted">Fecha: {{ rec.fecha_recuperacion }}</small>
                                 <br>
-                                {% if Number(rec.porcentaje_exigencia) >= 70 %}
-                                <span class="badge bg-danger" title="Sin justificar">Exigencia {{ Math.round(rec.porcentaje_exigencia) }}%</span>
+                                {% if rec.porcentaje_exigencia|float >= 70 %}
+                                <span class="badge bg-danger" title="Sin justificar">Exigencia {{ rec.porcentaje_exigencia|int }}%</span>
                                 {% else %}
-                                <span class="badge bg-success" title="Justificada">Exigencia {{ Math.round(rec.porcentaje_exigencia) }}%</span>
+                                <span class="badge bg-success" title="Justificada">Exigencia {{ rec.porcentaje_exigencia|int }}%</span>
                                 {% endif %}
                             </div>
-                            {% if rec.estado === 'pendiente' %}
+                            {% if rec.estado == 'pendiente' %}
                             <span class="badge bg-warning text-dark">Pendiente</span>
-                            {% elif rec.estado === 'completada' %}
+                            {% elif rec.estado == 'completada' %}
                             <span class="badge bg-success">Completada</span>
                             {% else %}
                             <span class="badge bg-secondary">Cancelada</span>
                             {% endif %}
                         </div>
                     </div>
-                    <% }) %>
+                    {% endfor %}
                 </div>
                 {% else %}
                 <p class="text-center text-muted py-4">Sin recuperaciones registradas.</p>

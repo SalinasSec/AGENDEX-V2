@@ -21,22 +21,22 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Hora</label>
-                            <input type="time" name="hora" class="form-control" value="{{ ev.hora || '' }}">
+                            <input type="time" name="hora" class="form-control" value="{{ ev.hora if ev.hora else '' }}">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Curso <span class="text-danger">*</span></label>
                             <select name="curso_id" id="cursoInput" class="form-select" required>
                                 {% for c in cursos %}
-                                <option value="{{ c.id }}" {{ ev.curso_id == c.id ? 'selected' : '' }}>{{ c.nombre }} ({{ c.nivel }})</option>
-                                <% }) %>
+                                <option value="{{ c.id }}" {% if ev.curso_id == c.id %}selected{% endif %}>{{ c.nombre }} ({{ c.nivel }})</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Asignatura <span class="text-danger">*</span></label>
                             <select name="asignatura_id" class="form-select" required>
                                 {% for a in asignaturas %}
-                                <option value="{{ a.id }}" {{ ev.asignatura_id == a.id ? 'selected' : '' }}>{{ a.nombre }}</option>
-                                <% }) %>
+                                <option value="{{ a.id }}" {% if ev.asignatura_id == a.id %}selected{% endif %}>{{ a.nombre }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -46,7 +46,7 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label">Descripción</label>
-                            <textarea name="descripcion" class="form-control" rows="3">{{ ev.descripcion || '' }}</textarea>
+                            <textarea name="descripcion" class="form-control" rows="3">{{ ev.descripcion if ev.descripcion else '' }}</textarea>
                         </div>
                     </div>
 
@@ -65,15 +65,13 @@
     </div>
 </div>
 
-<%- include('../partials/footer', {
-    scripts: `
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const fechaInput = document.getElementById('fechaInput');
     const cursoInput = document.getElementById('cursoInput');
     const disponibilidad = document.getElementById('disponibilidad');
     const btnSubmit = document.getElementById('btnSubmit');
-    const evalId = ${ev.id};
+    const evalId = {{ ev.id }};
 
     async function checkDisponibilidad() {
         const fecha = fechaInput.value;
@@ -85,8 +83,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const resp = await fetch('/evaluaciones/api/disponibilidad?curso_id=' + cursoId + '&fecha=' + fecha);
             const data = await resp.json();
-            const otherEvals = data.evaluaciones.filter(e => e.id != evalId);
-            const otherCount = otherEvals|length;
+            const otherEvals = data.evaluaciones ? data.evaluaciones.filter(e => e.id != evalId) : [];
+            const otherCount = otherEvals.length;
             if (otherCount >= 2) {
                 disponibilidad.className = 'alert alert-danger mt-3';
                 disponibilidad.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i><strong>No hay lugar.</strong> Ya existen 2 evaluaciones para este curso en esta fecha.';
@@ -107,7 +105,5 @@ document.addEventListener('DOMContentLoaded', function() {
     cursoInput.addEventListener('change', checkDisponibilidad);
 });
 </script>
-`
-}) %>
 
 {% endblock %}

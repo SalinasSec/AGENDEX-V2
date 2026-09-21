@@ -55,12 +55,12 @@
                             <tr>
                                 <td>
                                     <span>{{ ev.fecha }}</span>
-                                    {% if ev.fecha === today %}<span class="badge bg-success ms-1">Hoy</span>{% endif %}
+                                    {% if ev.fecha == today %}<span class="badge bg-success ms-1">Hoy</span>{% endif %}
                                 </td>
                                 <td><strong>{{ ev.titulo }}</strong></td>
                                 <td><span class="badge" style="background:{{ ev.asignatura.color }};">{{ ev.asignatura.nombre }}</span></td>
                             </tr>
-                            <% }) %>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -86,20 +86,20 @@
                     <div class="list-group-item px-0">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <strong class="small">{{ rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' }}</strong>
+                                <strong class="small">{{ rec.eval_titulo if rec.eval_titulo else (rec.evaluacion.titulo if rec.evaluacion else 'Evaluación') }}</strong>
                                 <br><small class="text-muted">Fecha: {{ rec.fecha_recuperacion }}</small>
                                 <br><small class="text-info">Exigencia: {{ rec.porcentaje_exigencia }}%</small>
                             </div>
-                            {% if rec.estado === 'pendiente' %}
+                            {% if rec.estado == 'pendiente' %}
                             <span class="badge bg-warning text-dark">Pendiente</span>
-                            {% elif rec.estado === 'completada' %}
+                            {% elif rec.estado == 'completada' %}
                             <span class="badge bg-success">Completada</span>
                             {% else %}
                             <span class="badge bg-secondary">Cancelada</span>
                             {% endif %}
                         </div>
                     </div>
-                    <% }) %>
+                    {% endfor %}
                 </div>
                 {% else %}
                 <div class="text-center text-muted py-4">

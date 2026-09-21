@@ -1094,12 +1094,16 @@ app.get('/reportes/carga', requireAuth, (req, res) => {
     };
   });
 
+  const totalEvals = datosCurso.reduce((a, b) => a + b.evals_mes, 0);
+  const maxEvals = Math.max(...datosCurso.map(d => d.evals_mes), 1);
   res.render('reportes/carga', {
     title: 'Carga Académica',
     active: 'carga',
     mes_nombre: mesesNombres[mes - 1],
     anio,
-    datos_curso: datosCurso
+    datos_curso: datosCurso,
+    total_evals: totalEvals,
+    max_evals: maxEvals
   });
 });
 

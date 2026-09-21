@@ -29,9 +29,10 @@
                     <div class="mb-3">
                         <label class="form-label">Rol <span class="text-danger">*</span></label>
                         <select name="rol" class="form-select" required>
-                            <% Object.entries(roles).forEach(([clave, label]) => { %>
-                            <option value="{{ clave }}">{{ label }}</option>
-                            <% }) %>
+                            <option value="utp">UTP / Directivo</option>
+                            <option value="profe">Profesor</option>
+                            <option value="inspe">Inspectoría</option>
+                            <option value="alumno">Alumno</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg me-1"></i>Crear Usuario</button>
@@ -57,13 +58,17 @@
                                 <td class="fw-semibold">{{ u.correo }}</td>
                                 <td>{{ u.nombre }}</td>
                                 <td>
-                                    <% 
-                                        const roleColors = { 'utp': '#8e44ad', 'profe': '#2563eb', 'inspe': '#e67e22', 'alumno': '#16a085' };
-                                        const roleLabels = { 'utp': 'UTP / Directivo', 'profe': 'Profesor', 'inspe': 'Inspectoría', 'alumno': 'Alumno' };
-                                    %>
-                                    <span class="badge" style="background:{{ roleColors[u.rol] || '#6c757d' }};">
-                                        {{ roleLabels[u.rol] || u.rol }}
-                                    </span>
+                                    {% if u.rol == 'utp' %}
+                                    <span class="badge" style="background:#8e44ad;">UTP / Directivo</span>
+                                    {% elif u.rol == 'profe' %}
+                                    <span class="badge" style="background:#2563eb;">Profesor</span>
+                                    {% elif u.rol == 'inspe' %}
+                                    <span class="badge" style="background:#e67e22;">Inspectoría</span>
+                                    {% elif u.rol == 'alumno' %}
+                                    <span class="badge" style="background:#16a085;">Alumno</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ u.rol }}</span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if u.activo %}
@@ -73,19 +78,19 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-end">
-                                    <form method="POST" action="/admin/usuarios/{{ encodeURIComponent(u.rut) }}/toggle" class="d-inline">
+                                    <form method="POST" action="/admin/usuarios/{{ u.rut }}/toggle" class="d-inline">
                                         <button type="submit" class="btn btn-sm btn-outline-secondary" title="Activar / Desactivar">
                                             {% if u.activo %}<i class="bi bi-pause-circle"></i>{% else %}<i class="bi bi-play-circle"></i>{% endif %}
                                         </button>
                                     </form>
-                                    {% if u.correo !== 'utp@liceorbl.cl' %}
-                                    <form method="POST" action="/admin/usuarios/{{ encodeURIComponent(u.rut) }}/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar al usuario {{ u.correo }}?')">
+                                    {% if u.correo != 'utp@liceorbl.cl' %}
+                                    <form method="POST" action="/admin/usuarios/{{ u.rut }}/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar al usuario {{ u.correo }}?')">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
                                     </form>
                                     {% endif %}
                                 </td>
                             </tr>
-                            <% }) %>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
