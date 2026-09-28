@@ -51,12 +51,14 @@ def role_required(*roles):
 @app.context_processor
 def inject_context():
     user = session.get('user')
-    hoy = date.today().strftime('%Y-%m-%d')
-    hoy_fmt = date.today().strftime('%d/%m/%Y')
+    dias = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+    meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+    t = date.today()
+    hoy_fmt = f"{dias[t.weekday()]}, {t.day} de {meses[t.month - 1]} de {t.year}"
     return dict(
         current_user=user,
         ROLES=ROLES,
-        today=hoy,
+        today=t.strftime('%Y-%m-%d'),
         today_formatted=hoy_fmt
     )
 
@@ -1107,7 +1109,7 @@ def admin_panel():
 
     return render_template(
         'admin/index.html',
-        title='Administración del Sistema',
+        title='Configuración',
         active='admin',
         cursos=cursos,
         asignaturas=asignaturas,
@@ -1211,7 +1213,7 @@ def admin_profesores():
         cursor.execute("SELECT * FROM profesores ORDER BY apellido ASC, nombre ASC")
         profesores = cursor.fetchall()
     conn.close()
-    return render_template('admin/profesores.html', title='Profesores', active='admin', data=profesores)
+    return render_template('admin/profesores.html', title='Gestión de Profesores', active='profesores', data=profesores)
 
 @app.route('/admin/profesores/<int:profe_id>/eliminar', methods=['POST'])
 @login_required

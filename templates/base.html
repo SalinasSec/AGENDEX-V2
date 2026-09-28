@@ -28,22 +28,31 @@
                     </a>
                 </li>
 
-                {% if current_user and current_user.rol != 'alumno' %}
-                <li class="nav-section">GESTIONES</li>
-                {% if current_user.rol in ['utp', 'profe', 'inspe'] %}
+                <!-- Navegación principal -->
+                {% if current_user and current_user.rol == 'alumno' %}
+                <li class="nav-section">MIS ACTIVIDADES</li>
+                <li>
+                    <a href="/evaluaciones" class="{{ 'active' if active == 'evaluaciones' else '' }}">
+                        <i class="bi bi-clipboard-check"></i><span>Mis Evaluaciones</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/recuperaciones" class="{{ 'active' if active == 'recuperaciones' else '' }}">
+                        <i class="bi bi-arrow-counterclockwise"></i><span>Mis Recuperaciones</span>
+                    </a>
+                </li>
+                {% elif current_user %}
+                <li class="nav-section">GESTIÓN ACADÉMICA</li>
                 <li>
                     <a href="/evaluaciones" class="{{ 'active' if active == 'evaluaciones' else '' }}">
                         <i class="bi bi-clipboard-check"></i><span>Evaluaciones</span>
                     </a>
                 </li>
-                {% endif %}
-                {% if current_user.rol in ['utp', 'profe', 'inspe'] %}
                 <li>
                     <a href="/alumnos" class="{{ 'active' if active == 'alumnos' else '' }}">
                         <i class="bi bi-people"></i><span>Alumnos</span>
                     </a>
                 </li>
-                {% endif %}
                 <li>
                     <a href="/recuperaciones" class="{{ 'active' if active == 'recuperaciones' else '' }}">
                         <i class="bi bi-arrow-counterclockwise"></i><span>Recuperaciones</span>
@@ -51,10 +60,10 @@
                 </li>
                 {% endif %}
 
-                <li class="nav-section">REPORTES</li>
+                <li class="nav-section">CALENDARIO & REPORTES</li>
                 <li>
                     <a href="/reportes/calendario" class="{{ 'active' if active == 'calendario' else '' }}">
-                        <i class="bi bi-calendar3"></i><span>Calendario</span>
+                        <i class="bi bi-calendar3"></i><span>Calendario Escolar</span>
                     </a>
                 </li>
                 {% if current_user and current_user.rol != 'alumno' %}
@@ -71,10 +80,15 @@
                 {% endif %}
 
                 {% if current_user and current_user.rol == 'utp' %}
-                <li class="nav-section">ADMINISTRACIÓN</li>
+                <li class="nav-section">ADMINISTRACIÓN UTP</li>
+                <li>
+                    <a href="/admin/profesores" class="{{ 'active' if active == 'profesores' else '' }}">
+                        <i class="bi bi-person-badge"></i><span>Gestión de Profesores</span>
+                    </a>
+                </li>
                 <li>
                     <a href="/admin" class="{{ 'active' if active == 'admin' else '' }}">
-                        <i class="bi bi-gear"></i><span>Configuración</span>
+                        <i class="bi bi-gear"></i><span>Configuración General</span>
                     </a>
                 </li>
                 {% endif %}
@@ -98,7 +112,12 @@
                         {% else %}
                             <nav aria-label="breadcrumb">
                                 <ol class="breadcrumb mb-0">
+                                    {% if title and title not in ['Dashboard', 'Inicio', 'Mi Panel de Alumno'] %}
+                                    <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-muted">Inicio</a></li>
+                                    <li class="breadcrumb-item active">{{ title }}</li>
+                                    {% else %}
                                     <li class="breadcrumb-item active">{{ title or 'Inicio' }}</li>
+                                    {% endif %}
                                 </ol>
                             </nav>
                         {% endif %}
