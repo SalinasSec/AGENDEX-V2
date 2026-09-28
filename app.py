@@ -694,8 +694,12 @@ def listar_recuperaciones():
 
 @app.route('/recuperaciones/crear', methods=['GET', 'POST'])
 @login_required
-@role_required('inspe', 'utp', 'profe')
+@role_required('profe', 'inspe')
 def crear_recuperacion():
+    if session['user']['rol'] == 'utp':
+        flash('La asignación de recuperaciones corresponde a Profesores e Inspectoría General. El perfil UTP cumple funciones de supervisión y reportería.', 'warning')
+        return redirect(url_for('listar_recuperaciones'))
+
     conn = get_db_connection()
 
     if request.method == 'POST':
@@ -726,18 +730,45 @@ def crear_recuperacion():
         return redirect(url_for('listar_recuperaciones'))
 
     with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM evaluaciones ORDER BY fecha DESC")
+        query_evals = """
+            SELECT e.*, c.nombre AS curso_nombre, a.nombre AS asignatura_nombre
+            FROM evaluaciones e
+            JOIN cursos c ON e.curso_id = c.id
+            JOIN asignaturas a ON e.asignatura_id = a.id
+        """
+        params_evals = []
+        if session['user']['rol'] == 'profe' and session['user'].get('profesor_id'):
+            query_evals += " WHERE e.profesor_id = %s"
+            params_evals.append(session['user']['profesor_id'])
+        query_evals += " ORDER BY e.fecha DESC"
+        cursor.execute(query_evals, params_evals)
         evaluaciones = cursor.fetchall()
-        cursor.execute("SELECT * FROM alumnos ORDER BY apellido ASC")
+        for ev in evaluaciones:
+            ev['curso'] = {'nombre': ev['curso_nombre']}
+            ev['asignatura'] = {'nombre': ev['asignatura_nombre']}
+
+        cursor.execute("""
+            SELECT al.*, c.nombre AS curso_nombre
+            FROM alumnos al
+            JOIN cursos c ON al.curso_id = c.id
+            ORDER BY c.nombre ASC, al.apellido ASC, al.nombre ASC
+        """)
         alumnos = cursor.fetchall()
+        for a in alumnos:
+            a['curso'] = {'nombre': a['curso_nombre']}
+            a['nombre_completo'] = f"{a['nombre']} {a['apellido']}"
     conn.close()
 
+    hoy = date.today().strftime('%Y-%m-%d')
     return render_template(
         'recuperaciones/crear.html',
         title='Agendar Recuperación',
         active='recuperaciones',
         evaluaciones=evaluaciones,
-        alumnos=alumnos
+        alumnos=alumnos,
+        hoy=hoy,
+        alumno_id_preselect=request.args.get('alumno_id', type=int),
+        evaluacion_id_preselect=request.args.get('evaluacion_id', type=int)
     )
 
 @app.route('/recuperaciones/<int:recup_id>/completar', methods=['POST'])

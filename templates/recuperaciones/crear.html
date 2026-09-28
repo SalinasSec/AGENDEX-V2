@@ -20,7 +20,7 @@
                             <select name="evaluacion_id" id="evalSelect" class="form-select" required>
                                 <option value="">Seleccionar evaluación...</option>
                                 {% for ev in evaluaciones %}
-                                <option value="{{ ev.id }}">{{ ev.titulo }} — {{ ev.curso.nombre }} ({{ ev.fecha }})</option>
+                                <option value="{{ ev.id }}">{{ ev.titulo }} — {{ ev.curso.nombre if (ev.curso and ev.curso.nombre) else (ev.curso_nombre or 'Curso') }} ({{ ev.fecha }})</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -29,7 +29,7 @@
                             <select name="alumno_id" class="form-select" required>
                                 <option value="">Seleccionar alumno...</option>
                                 {% for a in alumnos %}
-                                <option value="{{ a.id }}" {% if alumno_id_preselect == a.id %}selected{% endif %}>{{ a.nombre_completo }} — {{ a.curso.nombre if a.curso else '' }}</option>
+                                <option value="{{ a.id }}" {% if alumno_id_preselect == a.id %}selected{% endif %}>{{ a.nombre_completo if a.nombre_completo else (a.nombre ~ ' ' ~ a.apellido) }} — {{ a.curso.nombre if (a.curso and a.curso.nombre) else (a.curso_nombre or '') }}</option>
                                 {% endfor %}
                             </select>
                         </div>

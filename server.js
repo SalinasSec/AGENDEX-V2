@@ -808,9 +808,12 @@ app.get('/recuperaciones', requireAuth, (req, res) => {
 });
 
 app.get('/recuperaciones/crear', requireAuth, (req, res) => {
-  // Solo Inspectoría tiene la atribución de registrar justificativos y crear recuperaciones
-  if (req.session.user.rol !== 'inspe') {
-    req.flash('warning', 'La presentación de justificativos (certificados médicos, salidas pedagógicas) y asignación de recuperaciones corresponde a Inspectoría General.');
+  if (req.session.user.rol === 'utp') {
+    req.flash('warning', 'La asignación de recuperaciones corresponde a los Profesores e Inspectoría General. El perfil UTP cumple labores de supervisión y reportería.');
+    return res.redirect('/recuperaciones');
+  }
+  if (!['inspe', 'profe'].includes(req.session.user.rol)) {
+    req.flash('danger', 'No tienes permisos para agendar recuperaciones.');
     return res.redirect('/recuperaciones');
   }
 
@@ -819,7 +822,10 @@ app.get('/recuperaciones/crear', requireAuth, (req, res) => {
   const evalId = req.query.evaluacion_id ? Number(req.query.evaluacion_id) : null;
 
   // Enrich evaluations and students with related models
-  const enrichedEvals = store.evaluaciones.map(e => store.enrichEvaluacion(e));
+  let enrichedEvals = store.evaluaciones.map(e => store.enrichEvaluacion(e));
+  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
+    enrichedEvals = enrichedEvals.filter(e => e.profesor_id === req.session.user.profesor_id);
+  }
   const enrichedAlumnos = store.alumnos.map(a => store.getAlumno(a.id));
 
   res.render('recuperaciones/crear', {
@@ -833,7 +839,7 @@ app.get('/recuperaciones/crear', requireAuth, (req, res) => {
   });
 });
 
-app.post('/recuperaciones/crear', requireAuth, requireRole('inspe'), (req, res) => {
+app.post('/recuperaciones/crear', requireAuth, requireRole('inspe', 'profe'), (req, res) => {
   const { evaluacion_id, alumno_id, fecha_recuperacion, tipo_justificacion, motivo } = req.body;
   const aId = Number(alumno_id);
   const eId = Number(evaluacion_id);
