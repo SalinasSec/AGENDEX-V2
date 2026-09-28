@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS recuperaciones (
     fecha_recuperacion DATE NOT NULL,
     motivo VARCHAR(255),
     exigencia DECIMAL(5,2) NOT NULL DEFAULT 60.00,
-    estado ENUM('pendiente', 'rendida', 'cancelada') DEFAULT 'pendiente',
+    estado ENUM('pendiente', 'rendida', 'completada', 'cancelada') DEFAULT 'pendiente',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (evaluacion_id) REFERENCES evaluaciones(id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (alumno_id) REFERENCES alumnos(id) ON DELETE CASCADE ON UPDATE CASCADE

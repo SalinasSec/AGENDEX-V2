@@ -243,8 +243,10 @@ def index():
 @login_required
 def listar_evaluaciones():
     conn = get_db_connection()
-    curso_id = request.args.get('curso_id', '')
-    asignatura_id = request.args.get('asignatura_id', '')
+    curso_id = request.args.get('curso_id', '').strip()
+    asignatura_id = request.args.get('asignatura_id', '').strip()
+    fecha_desde = request.args.get('fecha_desde', '').strip()
+    fecha_hasta = request.args.get('fecha_hasta', '').strip()
 
     with conn.cursor() as cursor:
         cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
@@ -268,6 +270,12 @@ def listar_evaluaciones():
         if asignatura_id:
             query += " AND e.asignatura_id = %s"
             params.append(asignatura_id)
+        if fecha_desde:
+            query += " AND e.fecha >= %s"
+            params.append(fecha_desde)
+        if fecha_hasta:
+            query += " AND e.fecha <= %s"
+            params.append(fecha_hasta)
 
         query += " ORDER BY e.fecha DESC, e.hora ASC"
         cursor.execute(query, params)
@@ -296,8 +304,12 @@ def listar_evaluaciones():
         evaluaciones=evaluaciones,
         cursos=cursos,
         asignaturas=asignaturas,
-        filtro_curso=curso_id,
-        filtro_asignatura=asignatura_id
+        filtros={
+            'curso_id': int(curso_id) if curso_id.isdigit() else curso_id,
+            'asignatura_id': int(asignatura_id) if asignatura_id.isdigit() else asignatura_id,
+            'fecha_desde': fecha_desde,
+            'fecha_hasta': fecha_hasta
+        }
     )
 
 @app.route('/evaluaciones/crear', methods=['GET', 'POST'])
@@ -522,6 +534,107 @@ def api_disponibilidad():
         'hay_lugar': total < 2
     })
 
+@app.route('/evaluaciones/<int:eval_id>/editar', methods=['GET', 'POST'])
+@login_required
+@role_required('profe', 'utp')
+def editar_evaluacion(eval_id):
+    conn = get_db_connection()
+    user = session['user']
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color,
+                   p.nombre AS profe_nombre, p.apellido AS profe_apellido, c.nombre AS curso_nombre, c.nivel AS curso_nivel
+            FROM evaluaciones e
+            JOIN asignaturas a ON e.asignatura_id = a.id
+            JOIN profesores p ON e.profesor_id = p.id
+            JOIN cursos c ON e.curso_id = c.id
+            WHERE e.id = %s
+        """, (eval_id,))
+        ev = cursor.fetchone()
+        if not ev:
+            conn.close()
+            flash('Evaluación no encontrada.', 'danger')
+            return redirect(url_for('listar_evaluaciones'))
+
+        if user['rol'] == 'profe' and user.get('profesor_id') and ev['profesor_id'] != user['profesor_id']:
+            conn.close()
+            flash('No tienes permiso para editar evaluaciones de otros profesores.', 'danger')
+            return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
+
+        if request.method == 'POST':
+            titulo = request.form.get('titulo', '').strip()
+            descripcion = request.form.get('descripcion', '').strip()
+            fecha = request.form.get('fecha', '').strip()
+            hora = request.form.get('hora', '').strip() or None
+            curso_id = request.form.get('curso_id')
+            asignatura_id = request.form.get('asignatura_id')
+
+            # Validar límite de 2 evaluaciones si cambia fecha o curso
+            if str(ev['fecha']) != fecha or str(ev['curso_id']) != str(curso_id):
+                cursor.execute(
+                    "SELECT COUNT(*) AS total FROM evaluaciones WHERE curso_id = %s AND fecha = %s AND id != %s",
+                    (curso_id, fecha, eval_id)
+                )
+                if cursor.fetchone()['total'] >= 2:
+                    conn.close()
+                    flash('No se puede cambiar la fecha: ese curso ya tiene 2 evaluaciones ese día.', 'danger')
+                    return redirect(url_for('editar_evaluacion', eval_id=eval_id))
+
+            cursor.execute("""
+                UPDATE evaluaciones
+                SET titulo = %s, descripcion = %s, fecha = %s, hora = %s, curso_id = %s, asignatura_id = %s
+                WHERE id = %s
+            """, (titulo, descripcion, fecha, hora, curso_id, asignatura_id, eval_id))
+            conn.commit()
+            conn.close()
+            flash('Evaluación actualizada correctamente.', 'success')
+            return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
+
+        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+        cursos = cursor.fetchall()
+        cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
+        asignaturas = cursor.fetchall()
+
+    conn.close()
+    ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
+    ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
+    ev['curso'] = {'nombre': ev['curso_nombre'], 'nivel': ev.get('curso_nivel', 'Media')}
+    return render_template(
+        'evaluaciones/editar.html',
+        title='Editar Evaluación',
+        active='evaluaciones',
+        ev=ev,
+        cursos=cursos,
+        asignaturas=asignaturas
+    )
+
+@app.route('/evaluaciones/<int:eval_id>/eliminar', methods=['POST'])
+@login_required
+@role_required('profe', 'utp')
+def eliminar_evaluacion(eval_id):
+    conn = get_db_connection()
+    user = session['user']
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM evaluaciones WHERE id = %s", (eval_id,))
+        ev = cursor.fetchone()
+        if not ev:
+            conn.close()
+            flash('Evaluación no encontrada.', 'danger')
+            return redirect(url_for('listar_evaluaciones'))
+
+        if user['rol'] == 'profe' and user.get('profesor_id') and ev['profesor_id'] != user['profesor_id']:
+            conn.close()
+            flash('No tienes permiso para eliminar evaluaciones de otros profesores.', 'danger')
+            return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
+
+        cursor.execute("DELETE FROM recuperaciones WHERE evaluacion_id = %s", (eval_id,))
+        cursor.execute("DELETE FROM asistencia_evaluaciones WHERE evaluacion_id = %s", (eval_id,))
+        cursor.execute("DELETE FROM evaluaciones WHERE id = %s", (eval_id,))
+        conn.commit()
+    conn.close()
+    flash('Evaluación eliminada correctamente.', 'info')
+    return redirect(url_for('listar_evaluaciones'))
+
 # -------------------------------------------------------------
 # RECUPERACIONES
 # -------------------------------------------------------------
@@ -529,8 +642,11 @@ def api_disponibilidad():
 @login_required
 def listar_recuperaciones():
     conn = get_db_connection()
+    estado = request.args.get('estado', '').strip()
+    user = session.get('user', {})
+
     with conn.cursor() as cursor:
-        cursor.execute("""
+        query = """
             SELECT r.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha,
                    al.nombre AS alumno_nombre, al.apellido AS alumno_apellido, al.rut AS alumno_rut,
                    c.nombre AS curso_nombre, asig.nombre AS asignatura_nombre
@@ -539,20 +655,39 @@ def listar_recuperaciones():
             JOIN alumnos al ON r.alumno_id = al.id
             JOIN cursos c ON al.curso_id = c.id
             JOIN asignaturas asig ON e.asignatura_id = asig.id
-            ORDER BY r.fecha_recuperacion DESC
-        """)
+            WHERE 1=1
+        """
+        params = []
+        if user.get('rol') == 'profe' and user.get('profesor_id'):
+            query += " AND e.profesor_id = %s"
+            params.append(user['profesor_id'])
+        elif user.get('rol') == 'alumno' and user.get('alumno_id'):
+            query += " AND r.alumno_id = %s"
+            params.append(user['alumno_id'])
+
+        if estado:
+            if estado in ['completada', 'rendida']:
+                query += " AND r.estado IN ('completada', 'rendida')"
+            else:
+                query += " AND r.estado = %s"
+                params.append(estado)
+
+        query += " ORDER BY r.fecha_recuperacion DESC"
+        cursor.execute(query, params)
         recuperaciones = cursor.fetchall()
 
         for r in recuperaciones:
             r['alumno'] = {'nombre_completo': f"{r['alumno_nombre']} {r['alumno_apellido']}", 'rut': r['alumno_rut'], 'curso': {'nombre': r['curso_nombre']}}
             r['evaluacion'] = {'titulo': r['eval_titulo'], 'fecha': r['eval_fecha'], 'asignatura': {'nombre': r['asignatura_nombre']}}
+            r['porcentaje_exigencia'] = float(r.get('exigencia') or r.get('porcentaje_exigencia') or 60)
 
     conn.close()
     return render_template(
         'recuperaciones/listar.html',
         title='Evaluaciones de Recuperación',
         active='recuperaciones',
-        recuperaciones=recuperaciones
+        recuperaciones=recuperaciones,
+        filtros={'estado': estado}
     )
 
 @app.route('/recuperaciones/crear', methods=['GET', 'POST'])
@@ -582,9 +717,10 @@ def crear_recuperacion():
                 INSERT INTO recuperaciones (evaluacion_id, alumno_id, fecha_recuperacion, motivo, exigencia, estado)
                 VALUES (%s, %s, %s, %s, %s, 'pendiente')
             """, (evaluacion_id, alumno_id, fecha_recup, motivo, exigencia))
+            conn.commit()
 
         conn.close()
-        flash(f'Recuperación agendada con éxito ({exigencia}% de exigencia).', 'success')
+        flash(f'Recuperación agendada con éxito ({int(exigencia)}% de exigencia).', 'success')
         return redirect(url_for('listar_recuperaciones'))
 
     with conn.cursor() as cursor:
@@ -602,15 +738,40 @@ def crear_recuperacion():
         alumnos=alumnos
     )
 
+@app.route('/recuperaciones/<int:recup_id>/completar', methods=['POST'])
+@login_required
+@role_required('profe', 'inspe', 'utp')
+def completar_recuperacion(recup_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("UPDATE recuperaciones SET estado = 'completada' WHERE id = %s", (recup_id,))
+        conn.commit()
+    conn.close()
+    flash('Recuperación marcada como completada.', 'success')
+    return redirect(url_for('listar_recuperaciones'))
+
+@app.route('/recuperaciones/<int:recup_id>/cancelar', methods=['POST'])
+@login_required
+@role_required('profe', 'inspe', 'utp')
+def cancelar_recuperacion(recup_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("UPDATE recuperaciones SET estado = 'cancelada' WHERE id = %s", (recup_id,))
+        conn.commit()
+    conn.close()
+    flash('Recuperación cancelada.', 'info')
+    return redirect(url_for('listar_recuperaciones'))
+
 @app.route('/recuperaciones/<int:recup_id>/estado', methods=['POST'])
 @login_required
 @role_required('profe', 'inspe', 'utp')
 def cambiar_estado_recuperacion(recup_id):
     nuevo_estado = request.form.get('estado')
-    if nuevo_estado in ['pendiente', 'rendida', 'cancelada']:
+    if nuevo_estado in ['pendiente', 'completada', 'rendida', 'cancelada']:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute("UPDATE recuperaciones SET estado = %s WHERE id = %s", (nuevo_estado, recup_id))
+            conn.commit()
         conn.close()
         flash('Estado de recuperación actualizado.', 'success')
     return redirect(url_for('listar_recuperaciones'))
@@ -622,13 +783,30 @@ def cambiar_estado_recuperacion(recup_id):
 @login_required
 def listar_alumnos():
     conn = get_db_connection()
+    busqueda = request.args.get('busqueda', '').strip()
+    curso_id = request.args.get('curso_id', '').strip()
+
     with conn.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+        cursos = cursor.fetchall()
+
+        query = """
             SELECT al.*, c.nombre AS curso_nombre
             FROM alumnos al
             JOIN cursos c ON al.curso_id = c.id
-            ORDER BY c.nombre ASC, al.apellido ASC
-        """)
+            WHERE 1=1
+        """
+        params = []
+        if busqueda:
+            query += " AND (al.nombre LIKE %s OR al.apellido LIKE %s OR al.rut LIKE %s)"
+            term = f"%{busqueda}%"
+            params.extend([term, term, term])
+        if curso_id:
+            query += " AND al.curso_id = %s"
+            params.append(curso_id)
+
+        query += " ORDER BY c.nombre ASC, al.apellido ASC, al.nombre ASC"
+        cursor.execute(query, params)
         alumnos = cursor.fetchall()
         for a in alumnos:
             a['curso'] = {'nombre': a['curso_nombre']}
@@ -639,7 +817,63 @@ def listar_alumnos():
         'alumnos/listar.html',
         title='Nómina de Alumnos',
         active='alumnos',
-        alumnos=alumnos
+        alumnos=alumnos,
+        cursos=cursos,
+        filtros={'busqueda': busqueda, 'curso_id': curso_id}
+    )
+
+@app.route('/alumnos/crear', methods=['GET', 'POST'])
+@login_required
+@role_required('utp')
+def crear_alumno():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        rut = request.form.get('rut', '').strip()
+        nombre = request.form.get('nombre', '').strip()
+        apellido = request.form.get('apellido', '').strip()
+        curso_id = request.form.get('curso_id')
+
+        if not (rut and nombre and apellido and curso_id):
+            conn.close()
+            flash('Todos los campos son obligatorios.', 'danger')
+            return redirect(url_for('crear_alumno'))
+
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id FROM alumnos WHERE rut = %s", (rut,))
+            if cursor.fetchone():
+                conn.close()
+                flash('Ya existe un alumno registrado con ese RUT.', 'warning')
+                return redirect(url_for('crear_alumno'))
+
+            cursor.execute("""
+                INSERT INTO alumnos (rut, nombre, apellido, curso_id)
+                VALUES (%s, %s, %s, %s)
+            """, (rut, nombre, apellido, curso_id))
+            alumno_id = cursor.lastrowid
+
+            # Crear usuario para acceso del alumno
+            correo_alumno = f"{nombre.lower().replace(' ', '')}.{apellido.lower().replace(' ', '')}@liceorbl.cl"
+            cursor.execute("""
+                INSERT INTO usuarios (rut, correo, clave, nombre, rol, alumno_id, activo)
+                VALUES (%s, %s, %s, %s, 'alumno', %s, 1)
+                ON DUPLICATE KEY UPDATE alumno_id = VALUES(alumno_id)
+            """, (rut, correo_alumno, 'alumno123', f"{nombre} {apellido}", alumno_id))
+            conn.commit()
+
+        conn.close()
+        flash(f'Alumno {nombre} {apellido} registrado con éxito.', 'success')
+        return redirect(url_for('listar_alumnos'))
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+        cursos = cursor.fetchall()
+    conn.close()
+
+    return render_template(
+        'alumnos/crear.html',
+        title='Registrar Nuevo Alumno',
+        active='alumnos',
+        cursos=cursos
     )
 
 @app.route('/alumnos/<int:alumno_id>')
@@ -861,25 +1095,208 @@ def reporte_carga():
 def admin_panel():
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) AS total FROM cursos")
-        total_cursos = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM asignaturas")
-        total_asignaturas = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM profesores")
-        total_profesores = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM usuarios")
-        total_usuarios = cursor.fetchone()['total']
+        cursor.execute("SELECT * FROM cursos")
+        cursos = cursor.fetchall()
+        cursor.execute("SELECT * FROM asignaturas")
+        asignaturas = cursor.fetchall()
+        cursor.execute("SELECT * FROM profesores")
+        profesores = cursor.fetchall()
+        cursor.execute("SELECT * FROM usuarios")
+        usuarios = cursor.fetchall()
     conn.close()
 
     return render_template(
         'admin/index.html',
         title='Administración del Sistema',
         active='admin',
-        total_cursos=total_cursos,
-        total_asignaturas=total_asignaturas,
-        total_profesores=total_profesores,
-        total_usuarios=total_usuarios
+        cursos=cursos,
+        asignaturas=asignaturas,
+        profesores=profesores,
+        usuarios=usuarios,
+        total_cursos=len(cursos),
+        total_asignaturas=len(asignaturas),
+        total_profesores=len(profesores),
+        total_usuarios=len(usuarios)
     )
+
+# Admin: Cursos
+@app.route('/admin/cursos', methods=['GET', 'POST'])
+@login_required
+@role_required('utp')
+def admin_cursos():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        nivel = request.form.get('nivel', '').strip()
+        if nombre and nivel:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO cursos (nombre, nivel) VALUES (%s, %s)", (nombre, nivel))
+                conn.commit()
+            conn.close()
+            flash(f'Curso {nombre} registrado.', 'success')
+            return redirect(url_for('admin_cursos'))
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+        cursos = cursor.fetchall()
+    conn.close()
+    return render_template('admin/cursos.html', title='Cursos', active='admin', data=cursos)
+
+@app.route('/admin/cursos/<int:curso_id>/eliminar', methods=['POST'])
+@login_required
+@role_required('utp')
+def admin_eliminar_curso(curso_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM cursos WHERE id = %s", (curso_id,))
+        conn.commit()
+    conn.close()
+    flash('Curso eliminado.', 'info')
+    return redirect(url_for('admin_cursos'))
+
+# Admin: Asignaturas
+@app.route('/admin/asignaturas', methods=['GET', 'POST'])
+@login_required
+@role_required('utp')
+def admin_asignaturas():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        color = request.form.get('color', '#2563eb').strip()
+        if nombre:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO asignaturas (nombre, color) VALUES (%s, %s)", (nombre, color))
+                conn.commit()
+            conn.close()
+            flash(f'Asignatura {nombre} registrada.', 'success')
+            return redirect(url_for('admin_asignaturas'))
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
+        asignaturas = cursor.fetchall()
+    conn.close()
+    return render_template('admin/asignaturas.html', title='Asignaturas', active='admin', data=asignaturas)
+
+@app.route('/admin/asignaturas/<int:asig_id>/eliminar', methods=['POST'])
+@login_required
+@role_required('utp')
+def admin_eliminar_asignatura(asig_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM asignaturas WHERE id = %s", (asig_id,))
+        conn.commit()
+    conn.close()
+    flash('Asignatura eliminada.', 'info')
+    return redirect(url_for('admin_asignaturas'))
+
+# Admin: Profesores
+@app.route('/admin/profesores', methods=['GET', 'POST'])
+@login_required
+@role_required('utp')
+def admin_profesores():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        apellido = request.form.get('apellido', '').strip()
+        email = request.form.get('email', '').strip()
+        if nombre and apellido:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO profesores (nombre, apellido, email) VALUES (%s, %s, %s)", (nombre, apellido, email or None))
+                conn.commit()
+            conn.close()
+            flash(f'Profesor {nombre} {apellido} registrado.', 'success')
+            return redirect(url_for('admin_profesores'))
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM profesores ORDER BY apellido ASC, nombre ASC")
+        profesores = cursor.fetchall()
+    conn.close()
+    return render_template('admin/profesores.html', title='Profesores', active='admin', data=profesores)
+
+@app.route('/admin/profesores/<int:profe_id>/eliminar', methods=['POST'])
+@login_required
+@role_required('utp')
+def admin_eliminar_profesor(profe_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM profesores WHERE id = %s", (profe_id,))
+        conn.commit()
+    conn.close()
+    flash('Profesor eliminado.', 'info')
+    return redirect(url_for('admin_profesores'))
+
+# Admin: Usuarios
+@app.route('/admin/usuarios', methods=['GET', 'POST'])
+@login_required
+@role_required('utp')
+def admin_usuarios():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        rut = request.form.get('rut', '').strip()
+        correo = request.form.get('correo', '').strip()
+        clave = request.form.get('password', '').strip()
+        nombre = request.form.get('nombre', '').strip()
+        rol = request.form.get('rol', 'profe').strip()
+
+        if rut and correo and clave and nombre:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO usuarios (rut, correo, clave, nombre, rol, activo)
+                    VALUES (%s, %s, %s, %s, %s, 1)
+                """, (rut, correo, clave, nombre, rol))
+                conn.commit()
+            conn.close()
+            flash(f'Usuario {correo} creado con éxito.', 'success')
+            return redirect(url_for('admin_usuarios'))
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM usuarios ORDER BY nombre ASC")
+        usuarios = cursor.fetchall()
+    conn.close()
+    return render_template(
+        'admin/usuarios.html',
+        title='Usuarios',
+        active='admin',
+        data=usuarios,
+        roles={
+            'utp': 'UTP / Directivo',
+            'profe': 'Profesor',
+            'inspe': 'Inspectoría',
+            'alumno': 'Alumno'
+        }
+    )
+
+@app.route('/admin/usuarios/<string:rut>/toggle', methods=['POST'])
+@login_required
+@role_required('utp')
+def admin_toggle_usuario(rut):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT activo FROM usuarios WHERE rut = %s", (rut,))
+        row = cursor.fetchone()
+        if row:
+            nuevo_estado = 0 if row['activo'] else 1
+            cursor.execute("UPDATE usuarios SET activo = %s WHERE rut = %s", (nuevo_estado, rut))
+            conn.commit()
+            estado_txt = 'Activo' if nuevo_estado else 'Inactivo'
+            flash(f'Estado de usuario actualizado: {estado_txt}', 'info')
+    conn.close()
+    return redirect(url_for('admin_usuarios'))
+
+@app.route('/admin/usuarios/<string:rut>/eliminar', methods=['POST'])
+@login_required
+@role_required('utp')
+def admin_eliminar_usuario(rut):
+    if rut == '19.000.001-1':
+        flash('No se puede eliminar la cuenta principal de UTP.', 'danger')
+        return redirect(url_for('admin_usuarios'))
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM usuarios WHERE rut = %s AND correo != 'utp@liceorbl.cl'", (rut,))
+        conn.commit()
+    conn.close()
+    flash('Usuario eliminado.', 'info')
+    return redirect(url_for('admin_usuarios'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

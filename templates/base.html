@@ -114,7 +114,7 @@
                             {% set role_colors = {'utp': '#14213D', 'profe': '#2F6F4E', 'inspe': '#2C5F7A', 'alumno': '#A87F2C'} %}
                             {% set role_names = {'utp': 'UTP / Directivo', 'profe': 'Profesor', 'inspe': 'Inspectoría', 'alumno': 'Alumno'} %}
                             <span class="badge" style="background: {{ role_colors.get(current_user.rol, '#6c757d') }}; margin-right: 6px;">
-                                {{ current_user.rol.upper() }}
+                                {{ role_names.get(current_user.rol, current_user.rol).upper() }}
                             </span>
                             <i class="bi bi-person-circle me-1"></i> {{ current_user.nombre }}
                         </button>
