@@ -136,7 +136,7 @@
                                         <a href="/evaluaciones/<%= ev.id %>" 
                                            class="text-start text-decoration-none text-white small p-1 rounded shadow-xs d-block" 
                                            style="background:<%= (ev.asignatura && ev.asignatura.color) ? ev.asignatura.color : '#0d6efd' %>; transition: transform 0.15s ease;"
-                                           title="<%= ev.titulo %> &mdash; <%= ev.curso ? ev.curso.nombre : '' %> (<%= ev.hora || '' %>)">
+                                           title="<%= ev.titulo %> — <%= ev.curso ? ev.curso.nombre : '' %> (<%= ev.hora || '' %>)">
                                             <div class="fw-semibold text-truncate" style="font-size: 0.78rem;">
                                                 <i class="bi bi-pencil-square me-1"></i><%= ev.titulo %>
                                             </div>

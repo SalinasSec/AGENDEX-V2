@@ -43,7 +43,7 @@
                                     <option value="<%= ev.id %>" 
                                             data-curso-id="<%= ev.curso_id %>"
                                             <%= (typeof evaluacion_id_preselect !== 'undefined' && evaluacion_id_preselect == ev.id) ? 'selected' : '' %>>
-                                        <%= ev.titulo %> &bull; <%= cursoNombre %> (<%= ev.fecha %>) &mdash; [<%= asigNombre %>]
+                                        <%= ev.titulo %> • <%= cursoNombre %> (<%= ev.fecha %>) — [<%= asigNombre %>]
                                     </option>
                                 <% }) %>
                             </select>
@@ -59,7 +59,7 @@
                                     <option value="<%= a.id %>" 
                                             data-curso-id="<%= a.curso_id %>"
                                             <%= (typeof alumno_id_preselect !== 'undefined' && alumno_id_preselect == a.id) ? 'selected' : '' %>>
-                                        <%= a.nombre_completo || (a.nombre + ' ' + a.apellido) %> (<%= a.rut %>) <%= cursoAlumno ? '&mdash; Curso ' + cursoAlumno : '' %>
+                                        <%= a.nombre_completo || (a.nombre + ' ' + a.apellido) %> (<%= a.rut %>)<%= cursoAlumno ? ' — Curso ' + cursoAlumno : '' %>
                                     </option>
                                 <% }) %>
                             </select>
