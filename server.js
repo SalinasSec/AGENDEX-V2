@@ -1147,43 +1147,67 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
 
   const mesesList = mesesNombres.map((m, i) => ({ num: i + 1, nombre: m }));
 
-  // Enriquecer todas las evaluaciones
-  let baseEvalsCalendario = store.evaluaciones;
-  let baseRecupsCalendario = store.recuperaciones;
-  let cursosCalendario = store.cursos;
+  // Lista completa de cursos y profesores
+  const cursosCalendario = store.cursos;
+  const profesoresList = store.profesores.map(p => ({
+    id: p.id,
+    nombre: p.nombre_completo,
+    materia: p.materia
+  }));
 
-  // Si el usuario es profesor, solo ve evaluaciones y recuperaciones de sus módulos y cursos asignados
-  if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
-    baseEvalsCalendario = store.getEvaluacionesByProfesor(req.session.user.profesor_id);
-    baseRecupsCalendario = store.getRecuperacionesByProfesor(req.session.user.profesor_id);
-    const profObj = store.getProfesor(req.session.user.profesor_id);
-    if (profObj && profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
-      cursosCalendario = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
-    }
+  const profObj = (req.session.user.rol === 'profe' && req.session.user.profesor_id) ? store.getProfesor(req.session.user.profesor_id) : null;
+  const currentProfId = profObj ? profObj.id : null;
+  const misCursosIds = profObj && profObj.cursos_asignados ? profObj.cursos_asignados : [];
+
+  // Filtros adicionales: profesor específico o switch "Sólo mis pruebas"
+  let profesor_id = req.query.profesor_id ? Number(req.query.profesor_id) : null;
+  const solo_mis_pruebas = req.query.mis_pruebas === '1';
+  if (solo_mis_pruebas && currentProfId) {
+    profesor_id = currentProfId;
   }
 
-  const todasEvals = baseEvalsCalendario.map(e => store.enrichEvaluacion(e));
+  // Enriquecer todas las evaluaciones (incluyendo indicador si fue creada por el usuario actual)
+  const todasEvals = store.evaluaciones.map(e => {
+    const enriched = store.enrichEvaluacion(e);
+    return {
+      ...enriched,
+      es_mia: currentProfId ? (e.profesor_id === currentProfId) : false
+    };
+  });
 
-  // Filtrar evaluaciones del mes y año
+  // Filtrar evaluaciones del mes y año (visibles todas las de Marcela, Antonio, etc. para el curso)
   let evals = todasEvals.filter(e => {
     if (!e.fecha) return false;
     const parts = e.fecha.split('-');
-    const matchYearMonth = parseInt(parts[0]) === anio && parseInt(parts[1]) === mes;
+    const matchYearMonth = parseInt(parts[0], 10) === anio && parseInt(parts[1], 10) === mes;
     if (!matchYearMonth) return false;
-    if (curso_id) return e.curso_id === curso_id;
+    if (curso_id && e.curso_id !== curso_id) return false;
+    if (profesor_id && e.profesor_id !== profesor_id) return false;
     return true;
   });
 
   // Enriquecer y filtrar recuperaciones del mes y año
-  const todasRecups = baseRecupsCalendario.map(r => store.enrichRecuperacion(r));
+  const todasRecups = store.recuperaciones.map(r => {
+    const enriched = store.enrichRecuperacion(r);
+    const evalProfId = enriched.evaluacion ? enriched.evaluacion.profesor_id : null;
+    return {
+      ...enriched,
+      es_mia: currentProfId ? (evalProfId === currentProfId) : false
+    };
+  });
+
   let recups = todasRecups.filter(r => {
     if (!r.fecha_recuperacion) return false;
     const parts = r.fecha_recuperacion.split('-');
-    const matchYearMonth = parseInt(parts[0]) === anio && parseInt(parts[1]) === mes;
+    const matchYearMonth = parseInt(parts[0], 10) === anio && parseInt(parts[1], 10) === mes;
     if (!matchYearMonth) return false;
     if (curso_id) {
       const evalCursoId = r.evaluacion ? r.evaluacion.curso_id : (r.alumno ? r.alumno.curso_id : null);
       if (evalCursoId !== curso_id) return false;
+    }
+    if (profesor_id) {
+      const evalProfId = r.evaluacion ? r.evaluacion.profesor_id : null;
+      if (evalProfId !== profesor_id) return false;
     }
     if (req.session.user.rol === 'alumno' && req.session.user.alumno_id) {
       return r.alumno_id === req.session.user.alumno_id;
@@ -1194,7 +1218,7 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
   // Agrupar evaluaciones por día
   const evalsPorDia = {};
   evals.forEach(e => {
-    const dia = parseInt(e.fecha.split('-')[2]);
+    const dia = parseInt(e.fecha.split('-')[2], 10);
     if (!evalsPorDia[dia]) evalsPorDia[dia] = [];
     evalsPorDia[dia].push(e);
   });
@@ -1202,7 +1226,7 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
   // Agrupar recuperaciones por día
   const recupsPorDia = {};
   recups.forEach(r => {
-    const dia = parseInt(r.fecha_recuperacion.split('-')[2]);
+    const dia = parseInt(r.fecha_recuperacion.split('-')[2], 10);
     if (!recupsPorDia[dia]) recupsPorDia[dia] = [];
     recupsPorDia[dia].push(r);
   });
@@ -1245,7 +1269,11 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
     total_evals_mes: evals.length,
     total_recups_mes: recups.length,
     cursos: cursosCalendario,
-    filtros: { curso_id },
+    profesores: profesoresList,
+    filtros: { curso_id, profesor_id, solo_mis_pruebas },
+    mis_cursos_ids: misCursosIds,
+    es_profe: req.session.user.rol === 'profe',
+    current_prof_id: currentProfId,
     today_day: now.getDate(),
     today_month: now.getMonth() + 1,
     today_year: now.getFullYear()
@@ -1280,50 +1308,147 @@ app.get('/reportes/pendientes', requireAuth, (req, res) => {
 
 app.get('/reportes/carga', requireAuth, (req, res) => {
   const now = new Date();
-  const anio = now.getFullYear();
-  const mes = now.getMonth() + 1;
+  const anio = req.query.anio ? parseInt(req.query.anio, 10) : now.getFullYear();
+  const mes = req.query.mes ? parseInt(req.query.mes, 10) : now.getMonth() + 1;
   const mesesNombres = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  let cursosCarga = store.cursos;
-  let evalsBase = store.evaluaciones;
+  const meses = mesesNombres.map((nombre, idx) => ({
+    num: idx + 1,
+    nombre
+  }));
 
+  // Carga global del curso: Para que la carga académica tenga sentido real y pedagógico,
+  // se deben contabilizar TODAS las evaluaciones que tienen los estudiantes de ese curso
+  // programadas por TODOS los profesores en el período.
+  let cursosCarga = store.cursos;
+  const evalsBase = store.evaluaciones;
+
+  // Si el usuario es profesor, opcionalmente puede alternar entre ver todos o sólo sus cursos asignados
+  const soloMisCursos = req.query.mis_cursos === '1';
+  let profObj = null;
   if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
-    evalsBase = store.getEvaluacionesByProfesor(req.session.user.profesor_id);
-    const profObj = store.getProfesor(req.session.user.profesor_id);
-    if (profObj && profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
+    profObj = store.getProfesor(req.session.user.profesor_id);
+    if (soloMisCursos && profObj && profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
       cursosCarga = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
     }
   }
 
   const datosCurso = cursosCarga.map(c => {
-    const evalsMes = evalsBase.filter(e => {
+    // Todas las evaluaciones del curso en este año y mes (de todas las asignaturas)
+    const evalsCursoMes = evalsBase.filter(e => {
       if (e.curso_id !== c.id) return false;
       const parts = e.fecha.split('-');
-      return parseInt(parts[0]) === anio && parseInt(parts[1]) === mes;
-    }).length;
+      return parseInt(parts[0], 10) === anio && parseInt(parts[1], 10) === mes;
+    });
+
+    // Agrupar por fecha para detectar días con límite diario alcanzado (Tope 2 de 2 del Liceo)
+    const porFecha = {};
+    evalsCursoMes.forEach(e => {
+      if (!porFecha[e.fecha]) porFecha[e.fecha] = [];
+      porFecha[e.fecha].push(e);
+    });
+
+    const diasSaturados = []; // Días con 2 evaluaciones (Tope diario máximo alcanzado: 2/2)
+    const diasParciales = []; // Días con 1 evaluación (1 cupo restante)
+
+    Object.keys(porFecha).sort().forEach(fecha => {
+      const count = porFecha[fecha].length;
+      if (count >= 2) {
+        diasSaturados.push({
+          fecha,
+          count,
+          evaluaciones: porFecha[fecha]
+        });
+      } else if (count === 1) {
+        diasParciales.push({
+          fecha,
+          count,
+          evaluaciones: porFecha[fecha]
+        });
+      }
+    });
+
+    // Enriquecer detalle de evaluaciones con asignatura y profesor
+    const evalsDetalle = evalsCursoMes.map(e => {
+      const asig = store.getAsignatura(e.asignatura_id);
+      const prof = store.getProfesor(e.profesor_id);
+      const cuposOcupadosDia = porFecha[e.fecha] ? porFecha[e.fecha].length : 1;
+      return {
+        ...e,
+        asignatura: asig || { nombre: 'Asignatura', color: '#14213D' },
+        profesor: prof || { nombre_completo: 'Profesor' },
+        cuposOcupadosDia,
+        diaSaturado: cuposOcupadosDia >= 2
+      };
+    }).sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+    // Determinar nivel de carga del curso:
+    // - Alta carga: Si tiene días con tope diario copado (2/2) O si acumula 6 o más evaluaciones en el mes
+    // - Media: Si acumula 4 o 5 evaluaciones en el mes
+    // - Normal: Menos de 4 evaluaciones y sin días saturados
+    let cargaNivel = 'normal';
+    let cargaRazon = 'Carga equilibrada y sin días saturados';
+
+    if (diasSaturados.length > 0 && evalsCursoMes.length >= 6) {
+      cargaNivel = 'alta';
+      cargaRazon = `${diasSaturados.length} día(s) con tope diario completo (2/2 cupos agotados) y ${evalsCursoMes.length} evaluaciones mensuales`;
+    } else if (diasSaturados.length > 0) {
+      cargaNivel = 'alta';
+      cargaRazon = `${diasSaturados.length} día(s) con tope diario completo (2/2 cupos agotados)`;
+    } else if (evalsCursoMes.length >= 6) {
+      cargaNivel = 'alta';
+      cargaRazon = `${evalsCursoMes.length} evaluaciones en el mes (distribuidas en distintos días)`;
+    } else if (evalsCursoMes.length >= 4) {
+      cargaNivel = 'media';
+      cargaRazon = `${evalsCursoMes.length} evaluaciones en el mes (carga moderada)`;
+    } else if (evalsCursoMes.length > 0) {
+      cargaNivel = 'normal';
+      cargaRazon = `${evalsCursoMes.length} evaluación(es) en el mes`;
+    } else {
+      cargaNivel = 'normal';
+      cargaRazon = 'Sin evaluaciones calendarizadas este mes';
+    }
 
     const alumnosCount = store.getAlumnosByCurso(c.id).length;
 
     return {
       curso: c,
-      evals_mes: evalsMes,
-      alumnos: alumnosCount
+      evals_mes: evalsCursoMes.length,
+      alumnos: alumnosCount,
+      dias_saturados: diasSaturados,
+      dias_parciales: diasParciales,
+      carga_nivel: cargaNivel,
+      carga_razon: cargaRazon,
+      evaluaciones: evalsDetalle
     };
   });
 
   const totalEvals = datosCurso.reduce((a, b) => a + b.evals_mes, 0);
   const maxEvals = Math.max(...datosCurso.map(d => d.evals_mes), 1);
+  const cursosAltaCarga = datosCurso.filter(d => d.carga_nivel === 'alta').length;
+  const cursosMediaCarga = datosCurso.filter(d => d.carga_nivel === 'media').length;
+  const cursosNormalCarga = datosCurso.filter(d => d.carga_nivel === 'normal').length;
+  const totalDiasSaturados = datosCurso.reduce((sum, d) => sum + d.dias_saturados.length, 0);
+
   res.render('reportes/carga', {
     title: 'Carga Académica',
     active: 'carga',
     mes_nombre: mesesNombres[mes - 1],
+    mes,
     anio,
+    meses,
+    solo_mis_cursos: soloMisCursos,
+    prof_obj: profObj,
     datos_curso: datosCurso,
     total_evals: totalEvals,
-    max_evals: maxEvals
+    max_evals: maxEvals,
+    cursos_alta_carga: cursosAltaCarga,
+    cursos_media_carga: cursosMediaCarga,
+    cursos_normal_carga: cursosNormalCarga,
+    total_dias_saturados: totalDiasSaturados
   });
 });
 

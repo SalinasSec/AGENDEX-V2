@@ -53,34 +53,75 @@
             </div>
             <div class="col-6 col-sm-auto">
                 <label class="form-label small mb-1 fw-semibold">Año</label>
-                <input type="number" name="anio" class="form-control form-control-sm" value="<%= anio %>" style="max-width:110px;">
+                <input type="number" name="anio" class="form-control form-control-sm" value="<%= anio %>" style="max-width:95px;">
             </div>
+
             <% if (current_user.rol !== 'alumno') { %>
             <div class="col-12 col-sm-auto">
                 <label class="form-label small mb-1 fw-semibold">Filtrar por Curso</label>
                 <select name="curso_id" class="form-select form-select-sm">
                     <option value="">Todos los cursos</option>
-                    <% cursos.forEach(c => { %>
-                    <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
-                    <% }) %>
+                    <% if (typeof mis_cursos_ids !== 'undefined' && mis_cursos_ids && mis_cursos_ids.length > 0) { %>
+                    <optgroup label="Mis Cursos Asignados">
+                        <% cursos.filter(c => mis_cursos_ids.includes(c.id)).forEach(c => { %>
+                        <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>>★ <%= c.nombre %> (<%= c.nivel %>)</option>
+                        <% }) %>
+                    </optgroup>
+                    <optgroup label="Otros Cursos">
+                        <% cursos.filter(c => !mis_cursos_ids.includes(c.id)).forEach(c => { %>
+                        <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
+                        <% }) %>
+                    </optgroup>
+                    <% } else { %>
+                        <% cursos.forEach(c => { %>
+                        <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
+                        <% }) %>
+                    <% } %>
                 </select>
             </div>
+
+            <div class="col-12 col-sm-auto">
+                <label class="form-label small mb-1 fw-semibold">Filtrar por Docente</label>
+                <select name="profesor_id" class="form-select form-select-sm">
+                    <option value="">Todos los profesores</option>
+                    <% if (typeof profesores !== 'undefined' && profesores) { %>
+                        <% profesores.forEach(p => { %>
+                        <option value="<%= p.id %>" <%= filtros.profesor_id == p.id ? 'selected' : '' %>>
+                            <%= p.nombre %> <%= (typeof current_prof_id !== 'undefined' && current_prof_id === p.id) ? '(Tú)' : '' %>
+                        </option>
+                        <% }) %>
+                    <% } %>
+                </select>
+            </div>
+
+            <% if (typeof es_profe !== 'undefined' && es_profe) { %>
+            <div class="col-12 col-sm-auto pb-1">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" name="mis_pruebas" value="1" id="chkMisPruebas" <%= filtros.solo_mis_pruebas ? 'checked' : '' %>>
+                    <label class="form-check-label small fw-semibold text-secondary" for="chkMisPruebas">
+                        Ver sólo mis pruebas
+                    </label>
+                </div>
+            </div>
+            <% } %>
+
             <% } else { %>
             <div class="col-12 col-sm-auto">
                 <span class="badge bg-info-subtle text-info border border-info-subtle py-2 px-3">
-                    <i class="bi bi-mortarboard me-1"></i>Viendo sólo tu calendario escolar
+                    <i class="bi bi-mortarboard me-1"></i>Viendo tu calendario escolar
                 </span>
             </div>
             <% } %>
+
             <div class="col-12 col-sm-auto">
                 <button type="submit" class="btn btn-primary btn-sm w-100 w-sm-auto px-3">
                     <i class="bi bi-funnel me-1"></i> Aplicar Filtro
                 </button>
             </div>
-            <% if (filtros.curso_id) { %>
+            <% if (filtros.curso_id || filtros.profesor_id || filtros.solo_mis_pruebas) { %>
             <div class="col-12 col-sm-auto">
                 <a href="/reportes/calendario?mes=<%= mes %>&anio=<%= anio %>" class="btn btn-sm btn-outline-secondary w-100 w-sm-auto">
-                    <i class="bi bi-x-circle me-1"></i> Quitar filtro de curso
+                    <i class="bi bi-x-circle me-1"></i> Limpiar filtros
                 </a>
             </div>
             <% } %>
@@ -130,19 +171,38 @@
                                 </div>
 
                                 <div class="d-flex flex-column gap-1">
+                                    <!-- Si el curso está filtrado y el día tiene evaluaciones: Indicador de cupos copados -->
+                                    <% if (evals_por_dia[dia] && evals_por_dia[dia].length >= 2 && filtros.curso_id) { %>
+                                    <div class="badge bg-danger text-white w-100 text-truncate py-1 mb-1 shadow-xs" style="font-size: 0.65rem;" title="Tope máximo de 2 evaluaciones alcanzado en este curso">
+                                        <i class="bi bi-lock-fill me-1"></i>2/2 Cupos (Copado)
+                                    </div>
+                                    <% } else if (evals_por_dia[dia] && evals_por_dia[dia].length === 1 && filtros.curso_id) { %>
+                                    <div class="badge bg-info-subtle text-info-emphasis border border-info-subtle w-100 text-truncate py-0 mb-1" style="font-size: 0.62rem;" title="1 evaluación programada, queda 1 cupo disponible">
+                                        <i class="bi bi-unlock-fill me-1"></i>1 cupo disponible (1/2)
+                                    </div>
+                                    <% } %>
+
                                     <!-- Evaluaciones Regulares -->
                                     <% if (evals_por_dia[dia] && evals_por_dia[dia].length > 0) { %>
                                         <% evals_por_dia[dia].forEach(ev => { %>
                                         <a href="/evaluaciones/<%= ev.id %>" 
-                                           class="text-start text-decoration-none text-white small p-1 rounded shadow-xs d-block" 
+                                           class="text-start text-decoration-none text-white small p-1 rounded shadow-xs d-block <%= ev.es_mia ? 'border border-2 border-warning' : '' %>" 
                                            style="background:<%= (ev.asignatura && ev.asignatura.color) ? ev.asignatura.color : '#0d6efd' %>; transition: transform 0.15s ease;"
-                                           title="<%= ev.titulo %> — <%= ev.curso ? ev.curso.nombre : '' %> (<%= ev.hora || '' %>)">
-                                            <div class="fw-semibold text-truncate" style="font-size: 0.78rem;">
-                                                <i class="bi bi-pencil-square me-1"></i><%= ev.titulo %>
+                                           title="<%= ev.titulo %> — <%= ev.curso ? ev.curso.nombre : '' %> (<%= ev.profesor ? ev.profesor.nombre_completo : 'Docente' %> - <%= ev.hora || '' %>)">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="fw-semibold text-truncate" style="font-size: 0.78rem;">
+                                                    <i class="bi bi-pencil-square me-1"></i><%= ev.titulo %>
+                                                </div>
+                                                <% if (ev.es_mia) { %>
+                                                <span class="badge bg-warning text-dark py-0 px-1" style="font-size: 0.60rem;">Tú</span>
+                                                <% } %>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center opacity-90" style="font-size: 0.68rem;">
                                                 <span class="text-truncate"><%= ev.curso ? ev.curso.nombre : '' %></span>
                                                 <span><%= ev.hora || '' %></span>
+                                            </div>
+                                            <div class="opacity-90 text-truncate" style="font-size: 0.67rem; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 1px; margin-top: 1px;">
+                                                <i class="bi bi-person me-1"></i><%= ev.profesor ? ev.profesor.nombre_completo : 'Docente' %>
                                             </div>
                                         </a>
                                         <% }) %>

@@ -203,18 +203,24 @@ i.bi {
 }
 
 .main-content .container-fluid {
-    animation: apareceFluido 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: apareceFluido 0.25s ease-out;
 }
 
 @keyframes apareceFluido {
     from { 
         opacity: 0; 
-        transform: translateY(12px); 
     }
     to { 
         opacity: 1; 
-        transform: translateY(0); 
     }
+}
+
+.modal {
+    z-index: 1060 !important;
+}
+
+.modal-backdrop {
+    z-index: 1050 !important;
 }
 
 .topbar {

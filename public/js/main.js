@@ -41,4 +41,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }, 5000);
+
+    // Mover modales a document.body para evitar que queden atrapados detrás del backdrop
+    function relocateModals() {
+        document.querySelectorAll('.modal').forEach(function(modalEl) {
+            if (modalEl.parentElement && modalEl.parentElement !== document.body) {
+                document.body.appendChild(modalEl);
+            }
+        });
+    }
+    relocateModals();
+
+    // En caso de que se abran modales dinámicos
+    document.addEventListener('show.bs.modal', function(e) {
+        if (e.target && e.target.parentElement !== document.body) {
+            document.body.appendChild(e.target);
+        }
+    });
 });
