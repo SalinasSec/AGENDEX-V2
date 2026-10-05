@@ -110,6 +110,55 @@ def main():
         else:
             print(f"    [!] No se encontró {ruta_schema}")
 
+        print("[+] Verificando columnas y restricciones actualizadas...")
+        try:
+            # 1. Columna asistencia_guardada en evaluaciones
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = 'agendex_db' AND TABLE_NAME = 'evaluaciones' AND COLUMN_NAME = 'asistencia_guardada'
+            """)
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE evaluaciones ADD COLUMN asistencia_guardada TINYINT(1) DEFAULT 0")
+
+            # 2. Columna estado_asistencia en asistencia_evaluaciones
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = 'agendex_db' AND TABLE_NAME = 'asistencia_evaluaciones' AND COLUMN_NAME = 'estado_asistencia'
+            """)
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE asistencia_evaluaciones ADD COLUMN estado_asistencia ENUM('presente', 'injustificada', 'justificado', 'salida') DEFAULT 'presente'")
+
+            # 3. Columna motivo_inasistencia en asistencia_evaluaciones
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = 'agendex_db' AND TABLE_NAME = 'asistencia_evaluaciones' AND COLUMN_NAME = 'motivo_inasistencia'
+            """)
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE asistencia_evaluaciones ADD COLUMN motivo_inasistencia VARCHAR(255) DEFAULT NULL")
+
+            # 4. Asegurar índice único en asistencia_evaluaciones
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM information_schema.STATISTICS 
+                WHERE TABLE_SCHEMA = 'agendex_db' AND TABLE_NAME = 'asistencia_evaluaciones' AND INDEX_NAME = 'uk_eval_alumno'
+            """)
+            if cursor.fetchone()[0] == 0:
+                try:
+                    cursor.execute("ALTER TABLE asistencia_evaluaciones ADD UNIQUE KEY uk_eval_alumno (evaluacion_id, alumno_id)")
+                except Exception:
+                    pass
+
+            # 5. Columna exigencia en recuperaciones
+            cursor.execute("""
+                SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = 'agendex_db' AND TABLE_NAME = 'recuperaciones' AND COLUMN_NAME = 'exigencia'
+            """)
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE recuperaciones ADD COLUMN exigencia DECIMAL(5,2) NOT NULL DEFAULT 60.00")
+
+            print("    [OK] Esquema actualizado con éxito.")
+        except Exception as e:
+            print(f"    [!] Nota de actualización: {e}")
+
         print("[+] Cargando datos iniciales (cursos, asignaturas, profesores, alumnos)...")
         if os.path.exists(ruta_datos):
             sql_datos = leer_archivo_sql(ruta_datos)

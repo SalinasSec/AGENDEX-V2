@@ -55,12 +55,97 @@ def inject_context():
     meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
     t = date.today()
     hoy_fmt = f"{dias[t.weekday()]}, {t.day} de {meses[t.month - 1]} de {t.year}"
+
+    alumno_recups_count = 0
+    if user and user.get('rol') == 'alumno' and user.get('alumno_id'):
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) as cnt FROM recuperaciones WHERE alumno_id = %s AND estado = 'pendiente'", (user['alumno_id'],))
+                row = cursor.fetchone()
+                if row:
+                    alumno_recups_count = row['cnt']
+            conn.close()
+        except Exception:
+            pass
+
     return dict(
         current_user=user,
         ROLES=ROLES,
+        hoy=t.strftime('%Y-%m-%d'),
         today=t.strftime('%Y-%m-%d'),
-        today_formatted=hoy_fmt
+        today_formatted=hoy_fmt,
+        alumno_recups_count=alumno_recups_count
     )
+
+def check_and_update_database_schema(conn):
+    """
+    Verifica y actualiza automáticamente el esquema de MySQL si faltan columnas
+    o tablas de versiones anteriores (evita OperationalError 1054 / SyntaxError).
+    """
+    try:
+        with conn.cursor() as cursor:
+            # 1. Columna asistencia_guardada en evaluaciones
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'evaluaciones' AND COLUMN_NAME = 'asistencia_guardada'
+                """)
+                row = cursor.fetchone()
+                if row and row.get('cnt') == 0:
+                    cursor.execute("ALTER TABLE evaluaciones ADD COLUMN asistencia_guardada TINYINT(1) DEFAULT 0")
+            except Exception:
+                pass
+
+            # 2. Columna estado_asistencia en asistencia_evaluaciones
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asistencia_evaluaciones' AND COLUMN_NAME = 'estado_asistencia'
+                """)
+                row = cursor.fetchone()
+                if row and row.get('cnt') == 0:
+                    cursor.execute("ALTER TABLE asistencia_evaluaciones ADD COLUMN estado_asistencia ENUM('presente', 'injustificada', 'justificado', 'salida') DEFAULT 'presente'")
+            except Exception:
+                pass
+
+            # 3. Columna motivo_inasistencia en asistencia_evaluaciones
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asistencia_evaluaciones' AND COLUMN_NAME = 'motivo_inasistencia'
+                """)
+                row = cursor.fetchone()
+                if row and row.get('cnt') == 0:
+                    cursor.execute("ALTER TABLE asistencia_evaluaciones ADD COLUMN motivo_inasistencia VARCHAR(255) DEFAULT NULL")
+            except Exception:
+                pass
+
+            # 4. Asegurar índice único en asistencia_evaluaciones
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM information_schema.STATISTICS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asistencia_evaluaciones' AND INDEX_NAME = 'uk_eval_alumno'
+                """)
+                row = cursor.fetchone()
+                if row and row.get('cnt') == 0:
+                    cursor.execute("ALTER TABLE asistencia_evaluaciones ADD UNIQUE KEY uk_eval_alumno (evaluacion_id, alumno_id)")
+            except Exception:
+                pass
+
+            # 5. Columna exigencia en recuperaciones
+            try:
+                cursor.execute("""
+                    SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperaciones' AND COLUMN_NAME = 'exigencia'
+                """)
+                row = cursor.fetchone()
+                if row and row.get('cnt') == 0:
+                    cursor.execute("ALTER TABLE recuperaciones ADD COLUMN exigencia DECIMAL(5,2) NOT NULL DEFAULT 60.00")
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 # -------------------------------------------------------------
 # RUTAS DE AUTENTICACIÓN
@@ -137,32 +222,82 @@ def index():
                 SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color,
                        p.nombre AS profe_nombre, p.apellido AS profe_apellido, c.nombre AS curso_nombre
                 FROM evaluaciones e
-                JOIN asignaturas a ON e.asignatura_id = a.id
-                JOIN profesores p ON e.profesor_id = p.id
-                JOIN cursos c ON e.curso_id = c.id
+                LEFT JOIN asignaturas a ON e.asignatura_id = a.id
+                LEFT JOIN profesores p ON e.profesor_id = p.id
+                LEFT JOIN cursos c ON e.curso_id = c.id
                 WHERE e.curso_id = %s
                 ORDER BY e.fecha ASC
             """, (curso_id,))
             evals = cursor.fetchall()
 
             for ev in evals:
-                ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
-                ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
-                ev['curso'] = {'nombre': ev['curso_nombre']}
+                ev['asignatura'] = {'nombre': ev.get('asignatura_nombre') or 'General', 'color': ev.get('asignatura_color') or '#14213D'}
+                ev['profesor'] = {'nombre_completo': f"{ev.get('profe_nombre') or ''} {ev.get('profe_apellido') or ''}".strip() or 'Docente'}
+                ev['curso'] = {'nombre': ev.get('curso_nombre') or 'Curso'}
 
             cursor.execute("""
-                SELECT r.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha
+                SELECT r.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha, e.descripcion AS eval_descripcion,
+                       e.hora AS eval_hora,
+                       a.nombre AS asignatura_nombre, a.color AS asignatura_color,
+                       p.nombre AS profe_nombre, p.apellido AS profe_apellido, p.email AS profe_email
                 FROM recuperaciones r
                 JOIN evaluaciones e ON r.evaluacion_id = e.id
-                WHERE r.alumno_id = %s AND r.estado = 'pendiente'
-                ORDER BY r.fecha_recuperacion ASC
+                LEFT JOIN asignaturas a ON e.asignatura_id = a.id
+                LEFT JOIN profesores p ON e.profesor_id = p.id
+                WHERE r.alumno_id = %s
+                ORDER BY (r.estado = 'pendiente') DESC, r.fecha_recuperacion ASC
             """, (alumno_id,))
             recuperaciones = cursor.fetchall()
+
+            for r in recuperaciones:
+                f_rec = str(r['fecha_recuperacion'])
+                if f_rec == hoy:
+                    r['aviso_tiempo'] = '¡Rinde Hoy!'
+                    r['aviso_clase'] = 'danger'
+                elif f_rec > hoy:
+                    try:
+                        dias = (datetime.strptime(f_rec, '%Y-%m-%d').date() - date.today()).days
+                        if dias == 1:
+                            r['aviso_tiempo'] = 'Rinde Mañana'
+                            r['aviso_clase'] = 'warning text-dark'
+                        else:
+                            r['aviso_tiempo'] = f'En {dias} días'
+                            r['aviso_clase'] = 'primary'
+                    except Exception:
+                        r['aviso_tiempo'] = f_rec
+                        r['aviso_clase'] = 'secondary'
+                else:
+                    r['aviso_tiempo'] = 'Fecha cumplida'
+                    r['aviso_clase'] = 'secondary'
+
+                r['porcentaje_exigencia'] = float(r.get('exigencia') or 60)
+                prof_nom = f"{r.get('profe_nombre') or ''} {r.get('profe_apellido') or ''}".strip()
+                r['profesor_nombre'] = prof_nom or 'Profesor de la Asignatura'
+                r['asignatura'] = {'nombre': r.get('asignatura_nombre') or 'General', 'color': r.get('asignatura_color') or '#14213D'}
+
+            recs_pendientes = [r for r in recuperaciones if r['estado'] == 'pendiente']
+
+            # Inasistencias registradas a evaluaciones
+            cursor.execute("""
+                SELECT ae.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha,
+                       a.nombre AS asignatura_nombre, a.color AS asignatura_color,
+                       p.nombre AS profe_nombre, p.apellido AS profe_apellido
+                FROM asistencia_evaluaciones ae
+                JOIN evaluaciones e ON ae.evaluacion_id = e.id
+                LEFT JOIN asignaturas a ON e.asignatura_id = a.id
+                LEFT JOIN profesores p ON e.profesor_id = p.id
+                WHERE ae.alumno_id = %s AND ae.estado_asistencia != 'presente'
+                ORDER BY e.fecha DESC
+            """, (alumno_id,))
+            inasistencias = cursor.fetchall()
+            for inas in inasistencias:
+                inas['asignatura'] = {'nombre': inas.get('asignatura_nombre') or 'General', 'color': inas.get('asignatura_color') or '#14213D'}
+                inas['profesor_nombre'] = f"{inas.get('profe_nombre') or ''} {inas.get('profe_apellido') or ''}".strip() or 'Docente'
 
             stats = {
                 'total_evaluaciones': len(evals),
                 'evals_semana': len([e for e in evals if hoy <= str(e['fecha']) <= en_7]),
-                'recuperaciones_pendientes': len(recuperaciones)
+                'recuperaciones_pendientes': len(recs_pendientes)
             }
             conn.close()
             return render_template(
@@ -171,6 +306,8 @@ def index():
                 active='dashboard',
                 mis_evals=evals,
                 mis_recuperaciones=recuperaciones,
+                recuperaciones_pendientes=recs_pendientes,
+                inasistencias=inasistencias,
                 stats=stats,
                 alumno=alumno
             )
@@ -319,6 +456,7 @@ def listar_evaluaciones():
 @role_required('profe', 'utp')
 def crear_evaluacion():
     conn = get_db_connection()
+    check_and_update_database_schema(conn)
 
     if request.method == 'POST':
         titulo = request.form.get('titulo', '').strip()
@@ -327,9 +465,21 @@ def crear_evaluacion():
         hora = request.form.get('hora', '').strip() or None
         asignatura_id = request.form.get('asignatura_id')
         curso_id = request.form.get('curso_id')
-        profesor_id = session['user'].get('profesor_id') or 1
+        profesor_id = session['user'].get('profesor_id')
 
         with conn.cursor() as cursor:
+            # Validar profesor_id existente o tomar el primero
+            if profesor_id:
+                cursor.execute("SELECT id FROM profesores WHERE id = %s", (profesor_id,))
+                if not cursor.fetchone():
+                    cursor.execute("SELECT id FROM profesores LIMIT 1")
+                    first_p = cursor.fetchone()
+                    profesor_id = first_p['id'] if first_p else 1
+            else:
+                cursor.execute("SELECT id FROM profesores LIMIT 1")
+                first_p = cursor.fetchone()
+                profesor_id = first_p['id'] if first_p else 1
+
             # 1. Validación estricta de 2 evaluaciones diarias por curso (MySQL SP o query)
             cursor.execute(
                 "SELECT COUNT(*) AS total FROM evaluaciones WHERE curso_id = %s AND fecha = %s",
@@ -347,38 +497,56 @@ def crear_evaluacion():
                 INSERT INTO evaluaciones (titulo, descripcion, fecha, hora, asignatura_id, curso_id, profesor_id)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (titulo, descripcion, fecha, hora, asignatura_id, curso_id, profesor_id))
+            new_eval_id = cursor.lastrowid
+            conn.commit()
 
         conn.close()
         flash('Evaluación calendarizada exitosamente.', 'success')
-        return redirect(url_for('listar_evaluaciones'))
+        return redirect(url_for('detalle_evaluacion', eval_id=new_eval_id) if new_eval_id else url_for('listar_evaluaciones'))
 
+    hoy = date.today().strftime('%Y-%m-%d')
+    mi_profesor = None
     with conn.cursor() as cursor:
         cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
         cursos = cursor.fetchall()
         cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
         asignaturas = cursor.fetchall()
+
+        prof_id = session['user'].get('profesor_id')
+        if prof_id:
+            cursor.execute("SELECT * FROM profesores WHERE id = %s", (prof_id,))
+            p = cursor.fetchone()
+            if p:
+                p['nombre_completo'] = f"{p['nombre']} {p['apellido']}"
+                mi_profesor = p
     conn.close()
+
+    if not mi_profesor:
+        mi_profesor = {'nombre_completo': session['user'].get('nombre', 'Docente')}
 
     return render_template(
         'evaluaciones/crear.html',
         title='Calendarizar Evaluación',
         active='evaluaciones',
         cursos=cursos,
-        asignaturas=asignaturas
+        asignaturas=asignaturas,
+        mi_profesor=mi_profesor,
+        hoy=hoy
     )
 
 @app.route('/evaluaciones/<int:eval_id>')
 @login_required
 def detalle_evaluacion(eval_id):
     conn = get_db_connection()
+    check_and_update_database_schema(conn)
     with conn.cursor() as cursor:
         cursor.execute("""
             SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color,
                    p.nombre AS profe_nombre, p.apellido AS profe_apellido, c.nombre AS curso_nombre, c.nivel AS curso_nivel
             FROM evaluaciones e
-            JOIN asignaturas a ON e.asignatura_id = a.id
-            JOIN profesores p ON e.profesor_id = p.id
-            JOIN cursos c ON e.curso_id = c.id
+            LEFT JOIN asignaturas a ON e.asignatura_id = a.id
+            LEFT JOIN profesores p ON e.profesor_id = p.id
+            LEFT JOIN cursos c ON e.curso_id = c.id
             WHERE e.id = %s
         """, (eval_id,))
         ev = cursor.fetchone()
@@ -388,18 +556,23 @@ def detalle_evaluacion(eval_id):
             flash('Evaluación no encontrada.', 'danger')
             return redirect(url_for('listar_evaluaciones'))
 
-        ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
-        ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
-        ev['curso'] = {'nombre': ev['curso_nombre'], 'nivel': ev.get('curso_nivel', 'Media')}
+        ev['asignatura'] = {'nombre': ev.get('asignatura_nombre') or 'General', 'color': ev.get('asignatura_color') or '#14213D'}
+        prof_nombre = f"{ev.get('profe_nombre') or ''} {ev.get('profe_apellido') or ''}".strip() or 'Docente'
+        ev['profesor'] = {'nombre_completo': prof_nombre}
+        ev['curso'] = {'nombre': ev.get('curso_nombre') or 'Curso', 'nivel': ev.get('curso_nivel') or 'Media'}
 
         # Alumnos del curso
         cursor.execute("""
-            SELECT id, rut, nombre, apellido, CONCAT(nombre, ' ', apellido) as nombre_completo
+            SELECT id, rut, nombre, apellido, 
+                   CONCAT(COALESCE(nombre, ''), ' ', COALESCE(apellido, '')) as nombre_completo
             FROM alumnos
             WHERE curso_id = %s
             ORDER BY apellido ASC, nombre ASC
         """, (ev['curso_id'],))
         alumnos = cursor.fetchall()
+        for al in alumnos:
+            if not al.get('nombre_completo') or not al['nombre_completo'].strip():
+                al['nombre_completo'] = f"{al.get('nombre', '')} {al.get('apellido', '')}".strip() or al.get('rut', 'Alumno')
 
         # Asistencia registrada
         cursor.execute("""
@@ -409,7 +582,8 @@ def detalle_evaluacion(eval_id):
         asistencias_raw = cursor.fetchall()
         asistencias_map = {}
         for a in asistencias_raw:
-            asistencias_map[a['alumno_id']] = {
+            aid = a['alumno_id']
+            asistencias_map[aid] = {
                 'presente': a.get('presente', 1),
                 'justificado': a.get('justificado', 0),
                 'estado_asistencia': a.get('estado_asistencia') or ('justificado' if a.get('justificado') else ('presente' if a.get('presente') else 'injustificada')),
@@ -441,6 +615,7 @@ def detalle_evaluacion(eval_id):
 @role_required('profe', 'inspe', 'utp')
 def asistencia_evaluacion(eval_id):
     conn = get_db_connection()
+    check_and_update_database_schema(conn)
     with conn.cursor() as cursor:
         cursor.execute("SELECT * FROM evaluaciones WHERE id = %s", (eval_id,))
         ev = cursor.fetchone()
@@ -465,7 +640,7 @@ def asistencia_evaluacion(eval_id):
             estado_enviado = request.form.get(f'estado_{aid}')
             motivo_enviado = request.form.get(f'motivo_{aid}', '').strip()
 
-            cursor.execute("SELECT * FROM asistencia_evaluaciones WHERE evaluacion_id = %s AND alumno_id = %s", (eval_id, aid))
+            cursor.execute("SELECT id, estado_asistencia FROM asistencia_evaluaciones WHERE evaluacion_id = %s AND alumno_id = %s", (eval_id, aid))
             existing = cursor.fetchone()
 
             estado_final = 'presente'
@@ -482,34 +657,47 @@ def asistencia_evaluacion(eval_id):
                     estado_final = 'presente'
                 elif estado_enviado == 'salida':
                     estado_final = 'salida'
+                elif estado_enviado == 'justificado':
+                    estado_final = 'justificado'
+                elif estado_enviado == 'injustificada':
+                    estado_final = 'injustificada'
                 else:
                     if existing and existing.get('estado_asistencia') == 'justificado':
                         estado_final = 'justificado'
                     else:
-                        estado_final = 'injustificada'
+                        estado_final = 'presente'
 
             presente = 1 if estado_final == 'presente' else 0
             justificado = 1 if estado_final in ('justificado', 'salida') else 0
             motivo = motivo_enviado if estado_final != 'presente' else None
 
-            cursor.execute("""
-                INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, estado_asistencia, presente, justificado, motivo_inasistencia)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                estado_asistencia=VALUES(estado_asistencia),
-                presente=VALUES(presente),
-                justificado=VALUES(justificado),
-                motivo_inasistencia=VALUES(motivo_inasistencia)
-            """, (eval_id, aid, estado_final, presente, justificado, motivo))
+            if existing:
+                cursor.execute("""
+                    UPDATE asistencia_evaluaciones
+                    SET estado_asistencia = %s, presente = %s, justificado = %s, motivo_inasistencia = %s
+                    WHERE id = %s
+                """, (estado_final, presente, justificado, motivo, existing['id']))
+            else:
+                cursor.execute("""
+                    INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, estado_asistencia, presente, justificado, motivo_inasistencia)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (eval_id, aid, estado_final, presente, justificado, motivo))
 
         # Si el profesor guarda, se marca la evaluación como asistencia cerrada
         if user_rol == 'profe':
-            cursor.execute("UPDATE evaluaciones SET asistencia_guardada = 1 WHERE id = %s", (eval_id,))
+            try:
+                cursor.execute("UPDATE evaluaciones SET asistencia_guardada = 1 WHERE id = %s", (eval_id,))
+            except Exception:
+                try:
+                    cursor.execute("ALTER TABLE evaluaciones ADD COLUMN asistencia_guardada TINYINT(1) DEFAULT 0")
+                    cursor.execute("UPDATE evaluaciones SET asistencia_guardada = 1 WHERE id = %s", (eval_id,))
+                except Exception:
+                    pass
 
         conn.commit()
 
     conn.close()
-    flash('Asistencia actualizada correctamente.', 'success')
+    flash('Asistencia guardada exitosamente. Ha quedado registrada y cerrada para el curso.', 'success')
     return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
 
 @app.route('/evaluaciones/api/disponibilidad')

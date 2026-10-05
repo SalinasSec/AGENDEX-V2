@@ -186,7 +186,60 @@
 
                 <% } else if (current_user.rol === 'profe') { %>
                     <!-- Panel para Profesor -->
-                    <% if (ev.asistencia_guardada) { %>
+                    <% if (ev.fecha > hoy) { %>
+                    <!-- Caso 1: La evaluación es para una fecha futura -->
+                    <div class="alert alert-primary bg-primary bg-opacity-10 border-primary border-opacity-25 py-3 mb-3">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-primary fs-6"><i class="bi bi-calendar-check me-1"></i>Evaluación Calendarizada</span>
+                            <strong class="text-primary">Programada para el <%= ev.fecha %> <%= ev.hora ? 'a las ' + ev.hora : '' %></strong>
+                        </div>
+                        <p class="small text-muted mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Esta evaluación se encuentra planificada para una fecha futura. El botón y registro para <strong>Guardar Asistencia</strong> se habilitarán automáticamente el día fijado para la rendición de la prueba. A continuación se visualiza la nómina de estudiantes convocados del curso.
+                        </p>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="min-width: 580px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th>Alumno</th>
+                                    <th>RUT</th>
+                                    <th class="text-center">Condición Actual</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% alumnos.forEach((alumno, idx) => { %>
+                                <tr>
+                                    <td class="text-muted small"><%= idx + 1 %></td>
+                                    <td>
+                                        <div class="fw-semibold"><%= alumno.nombre_completo %></div>
+                                    </td>
+                                    <td class="text-muted small font-monospace"><%= alumno.rut %></td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-clock text-primary me-1"></i>Convocado(a) a Rendición
+                                        </span>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 pt-3 border-top">
+                        <a href="/evaluaciones" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left me-1"></i>Volver a Evaluaciones
+                        </a>
+                        <% if (current_user.profesor_id == ev.profesor_id) { %>
+                        <a href="/evaluaciones/<%= ev.id %>/editar" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-pencil me-1"></i>Editar Evaluación
+                        </a>
+                        <% } %>
+                    </div>
+
+                    <% } else if (ev.asistencia_guardada) { %>
                     <!-- Si ya fue guardada por el profesor: no se puede cambiar después -->
                     <div class="alert alert-success border border-success-subtle d-flex align-items-center justify-content-between py-2 px-3 mb-3">
                         <div>
@@ -244,6 +297,13 @@
                                         <span class="badge bg-danger" title="70% de exigencia">70%</span>
                                         <% } else { %>
                                         <span class="badge bg-success" title="60% regular">60%</span>
+                                        <% } %>
+                                        <% if (estadoActual !== 'presente' && ['profe', 'inspe'].includes(current_user.rol)) { %>
+                                        <div class="mt-1">
+                                            <a href="/recuperaciones/crear?evaluacion_id=<%= ev.id %>&alumno_id=<%= alumno.id %>" class="btn btn-outline-warning btn-sm py-0 px-2" style="font-size: 0.72rem;">
+                                                <i class="bi bi-calendar-plus me-1"></i>Recuperar
+                                            </a>
+                                        </div>
                                         <% } %>
                                     </td>
                                 </tr>

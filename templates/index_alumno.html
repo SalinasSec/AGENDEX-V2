@@ -2,10 +2,102 @@
 {% block content %}
 
 
-<div class="alert alert-info">
+<div class="alert alert-info py-2 mb-3">
     <i class="bi bi-info-circle me-2"></i>
-    Bienvenido, <strong>{{ current_user.nombre }}</strong>. Desde aquí puedes consultar tus evaluaciones y recuperaciones.
+    Bienvenido(a), <strong>{{ current_user.nombre }}</strong>. Panel oficial de evaluaciones y recuperaciones del Liceo Industrial RBL.
 </div>
+
+{% if recuperaciones_pendientes|length > 0 %}
+<div class="card border-warning shadow-sm mb-4">
+    <div class="card-header bg-warning bg-opacity-10 border-warning py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark fs-6"><i class="bi bi-bell-fill me-1"></i>Notificación Oficial</span>
+            <h5 class="mb-0 fw-bold text-dark">Tienes {{ recuperaciones_pendientes|length }} Evaluación(es) Recuperativa(s) por Rendir</h5>
+        </div>
+        <span class="badge bg-danger fs-6 px-3 py-1">Atención Requerida</span>
+    </div>
+    <div class="card-body p-3 p-md-4">
+        <p class="text-muted small mb-3">
+            <i class="bi bi-info-circle me-1 text-primary"></i>
+            Registraste inasistencia a una o más evaluaciones regulares. A continuación se detallan las fechas, asignaturas, docentes y exigencias reglamentarias con las que deberás rendir tu prueba:
+        </p>
+
+        <div class="row g-3">
+            {% for rec in recuperaciones_pendientes %}
+            <div class="col-12 col-lg-6">
+                <div class="p-3 rounded border border-2 border-warning-subtle bg-white h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <span class="badge" style="background:{{ rec.asignatura.color }};">{{ rec.asignatura.nombre }}</span>
+                            <span class="badge bg-{{ rec.aviso_clase }} py-1 px-2 fw-semibold">{{ rec.aviso_tiempo }}</span>
+                        </div>
+                        <h6 class="fw-bold mb-1 text-dark">{{ rec.eval_titulo }}</h6>
+                        <div class="small text-muted mb-2">
+                            <i class="bi bi-calendar-event me-1"></i>Evaluación regular: {{ rec.eval_fecha }}
+                        </div>
+
+                        <div class="p-2 rounded bg-light border small mb-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted"><i class="bi bi-calendar-check text-primary me-1"></i><strong>Fecha Programada:</strong></span>
+                                <strong class="text-primary fs-6">{{ rec.fecha_recuperacion }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted"><i class="bi bi-person text-secondary me-1"></i><strong>Profesor(a):</strong></span>
+                                <span>{{ rec.profesor_nombre }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted"><i class="bi bi-shield-check text-success me-1"></i><strong>Exigencia:</strong></span>
+                                {% if rec.porcentaje_exigencia == 60 %}
+                                <span class="badge bg-success" title="Inasistencia justificada reglamentariamente">60% (Justificado)</span>
+                                {% else %}
+                                <span class="badge bg-danger" title="Inasistencia sin justificar oficial">70% (Injustificada)</span>
+                                {% endif %}
+                            </div>
+                            {% if rec.motivo %}
+                            <div class="mt-2 pt-1 border-top text-muted">
+                                <strong>Justificativo:</strong> {{ rec.motivo }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="alert alert-light border border-info-subtle small mb-0 py-2">
+                        <i class="bi bi-geo-alt-fill text-primary me-1"></i>
+                        <strong>Instrucción:</strong> Preséntate en sala con tu profesor(a) para coordinar la toma de la prueba en la fecha indicada.
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if inasistencias and inasistencias|length > 0 %}
+<div class="alert alert-light border border-warning-subtle mb-4 py-3">
+    <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-clock-history text-warning fs-4 mt-1"></i>
+        <div>
+            <h6 class="fw-bold mb-1">Historial de Inasistencias a Evaluaciones</h6>
+            <p class="small text-muted mb-2">Tienes inasistencia registrada en las siguientes evaluaciones. Si amerita justificativo médico o de fuerza mayor, debes presentarlo en Inspectoría General a la brevedad:</p>
+            <div class="d-flex flex-wrap gap-2">
+                {% for inas in inasistencias %}
+                <span class="badge bg-light text-dark border p-2">
+                    <span class="badge me-1" style="background:{{ inas.asignatura.color }};">{{ inas.asignatura.nombre }}</span>
+                    {{ inas.eval_titulo }} ({{ inas.eval_fecha }}) &mdash;
+                    {% if inas.estado_asistencia == 'justificado' %}
+                    <span class="text-success fw-bold"><i class="bi bi-check-circle me-1"></i>Justificado por Inspectoría</span>
+                    {% elif inas.estado_asistencia == 'salida' %}
+                    <span class="text-info text-dark fw-bold"><i class="bi bi-bus-front me-1"></i>Salida Pedagógica</span>
+                    {% else %}
+                    <span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle me-1"></i>Sin Justificar (70% exigencia)</span>
+                    {% endif %}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <div class="row g-3 mb-4">
     <div class="col-md-4">
@@ -83,20 +175,38 @@
                 {% if mis_recuperaciones|length > 0 %}
                 <div class="list-group list-group-flush mb-3">
                     {% for rec in mis_recuperaciones %}
-                    <div class="list-group-item px-0">
-                        <div class="d-flex justify-content-between align-items-start">
+                    <div class="list-group-item px-0 py-3 border-bottom">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
-                                <strong class="small">{{ rec.eval_titulo if rec.eval_titulo else (rec.evaluacion.titulo if rec.evaluacion else 'Evaluación') }}</strong>
-                                <br><small class="text-muted">Fecha: {{ rec.fecha_recuperacion }}</small>
-                                <br><small class="text-info">Exigencia: {{ rec.porcentaje_exigencia }}%</small>
+                                <span class="badge mb-1" style="background:{{ rec.asignatura.color }};">{{ rec.asignatura.nombre }}</span>
+                                <div class="fw-bold small">{{ rec.eval_titulo if rec.eval_titulo else (rec.evaluacion.titulo if rec.evaluacion else 'Evaluación') }}</div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-calendar-event me-1"></i>Rendir: <strong>{{ rec.fecha_recuperacion }}</strong>
+                                    {% if rec.aviso_tiempo %}
+                                    <span class="badge bg-{{ rec.aviso_clase }} ms-1 py-0 px-2" style="font-size:0.75rem;">{{ rec.aviso_tiempo }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-person me-1"></i>{{ rec.profesor_nombre }}
+                                </div>
+                                <div class="small">
+                                    <span class="text-muted">Exigencia:</span>
+                                    {% if rec.porcentaje_exigencia == 60 %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">60% (Justificado)</span>
+                                    {% else %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">70% (Injustificada)</span>
+                                    {% endif %}
+                                </div>
                             </div>
-                            {% if rec.estado == 'pendiente' %}
-                            <span class="badge bg-warning text-dark">Pendiente</span>
-                            {% elif rec.estado == 'completada' %}
-                            <span class="badge bg-success">Completada</span>
-                            {% else %}
-                            <span class="badge bg-secondary">Cancelada</span>
-                            {% endif %}
+                            <div>
+                                {% if rec.estado == 'pendiente' %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Pendiente</span>
+                                {% elif rec.estado == 'completada' %}
+                                <span class="badge bg-success"><i class="bi bi-check2-circle me-1"></i>Rendida</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Cancelada</span>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                     {% endfor %}

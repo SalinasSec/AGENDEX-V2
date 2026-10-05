@@ -159,7 +159,7 @@
         <div class="text-center py-5 text-muted">
             <i class="bi bi-check-circle display-1 text-success"></i>
             <p class="mt-3">No hay recuperaciones en esta categoría.</p>
-            {% if current_user.rol in ['profe', 'inspe'] %}
+            {% if current_user.rol in ['profe'] %}
             <a href="/recuperaciones/crear" class="btn btn-warning"><i class="bi bi-plus-circle me-1"></i>Asignar nueva</a>
             {% endif %}
         </div>

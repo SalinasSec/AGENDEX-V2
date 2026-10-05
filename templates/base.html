@@ -37,8 +37,13 @@
                     </a>
                 </li>
                 <li>
-                    <a href="/recuperaciones" class="{{ 'active' if active == 'recuperaciones' else '' }}">
-                        <i class="bi bi-arrow-counterclockwise"></i><span>Mis Recuperaciones</span>
+                    <a href="/recuperaciones" class="{{ 'active' if active == 'recuperaciones' else '' }} d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-arrow-counterclockwise"></i><span>Mis Recuperaciones</span>
+                        </div>
+                        {% if alumno_recups_count and alumno_recups_count > 0 %}
+                        <span class="badge bg-danger rounded-pill" title="Tienes {{ alumno_recups_count }} recuperación(es) pendiente(s)">{{ alumno_recups_count }}</span>
+                        {% endif %}
                     </a>
                 </li>
                 {% elif current_user %}

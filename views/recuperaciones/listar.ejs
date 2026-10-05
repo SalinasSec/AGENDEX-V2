@@ -22,12 +22,27 @@
     </div>
 </div>
 
+<% if (current_user && current_user.rol === 'alumno') { %>
+<div class="alert alert-warning bg-warning bg-opacity-10 border border-warning-subtle py-3 mb-4">
+    <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-info-circle-fill text-warning fs-4 mt-1"></i>
+        <div>
+            <h6 class="fw-bold mb-1">Información de Evaluaciones Recuperativas</h6>
+            <p class="small text-muted mb-0">
+                Si registraste inasistencia a una prueba regular, aquí puedes revisar la <strong>fecha programada</strong> por tu profesor para rendirla, el <strong>porcentaje de exigencia</strong> (60% regular si justificaste con certificado médico en Inspectoría, o 70% si fue injustificada), y las observaciones correspondientes.
+            </p>
+        </div>
+    </div>
+</div>
+<% } %>
+
 <div class="card mb-4">
     <div class="card-body py-3">
         <div class="d-flex flex-wrap gap-2" role="group">
             <a href="/recuperaciones" class="btn btn-sm <%= !filtros.estado ? 'btn-primary' : 'btn-outline-primary' %>">Todas</a>
             <a href="/recuperaciones?estado=pendiente" class="btn btn-sm <%= filtros.estado === 'pendiente' ? 'btn-warning' : 'btn-outline-warning' %>">Pendientes</a>
-            <a href="/recuperaciones?estado=completada" class="btn btn-sm <%= filtros.estado === 'completada' ? 'btn-success' : 'btn-outline-success' %>">Completadas</a>
+            <a href="/recuperaciones?estado=completada" class="btn btn-sm <%= filtros.estado === 'completada' ? 'btn-success' : 'btn-outline-success' %>">Rendidas / Completadas</a>
+            <a href="/recuperaciones?estado=no_presento" class="btn btn-sm <%= filtros.estado === 'no_presento' ? 'btn-danger' : 'btn-outline-danger' %>">No se presentó (Nota 1.1)</a>
             <a href="/recuperaciones?estado=cancelada" class="btn btn-sm <%= filtros.estado === 'cancelada' ? 'btn-secondary' : 'btn-outline-secondary' %>">Canceladas</a>
         </div>
     </div>
@@ -77,9 +92,16 @@
                                 const esInjust = (rec.tipo_justificacion === 'injustificada') || (Number(rec.porcentaje_exigencia) >= 70);
                             %>
                             <% if (esInjust) { %>
-                                <span class="badge bg-danger" title="Sin justificativo válido">
+                                <span class="badge bg-danger" title="Sin justificativo médico válido">
                                     <i class="bi bi-exclamation-octagon me-1"></i>70% Injustificada
                                 </span>
+                                <% if (current_user.rol === 'inspe') { %>
+                                <div class="mt-1">
+                                    <button type="button" class="btn btn-outline-success btn-sm py-0 px-2" style="font-size:0.72rem;" data-bs-toggle="modal" data-bs-target="#modalJustificar<%= rec.id %>">
+                                        <i class="bi bi-file-earmark-medical me-1"></i>Acreditar Médico (60%)
+                                    </button>
+                                </div>
+                                <% } %>
                             <% } else if (esSalida) { %>
                                 <span class="badge bg-info text-dark" title="Salida pedagógica autorizada por Inspectoría">
                                     <i class="bi bi-bus-front me-1"></i>60% Salida Pedagógica
@@ -95,7 +117,9 @@
                             <% if (rec.estado === 'pendiente') { %>
                             <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Pendiente</span>
                             <% } else if (rec.estado === 'completada') { %>
-                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Completada</span>
+                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Rendida</span>
+                            <% } else if (rec.estado === 'no_presento') { %>
+                            <span class="badge bg-danger"><i class="bi bi-x-octagon me-1"></i>No se presentó (Nota 1.1)</span>
                             <% } else { %>
                             <span class="badge bg-secondary">Cancelada</span>
                             <% } %>
@@ -103,12 +127,17 @@
                         <% if (['inspe','profe'].includes(current_user.rol)) { %>
                         <td class="text-end nowrap">
                             <% if (rec.estado === 'pendiente') { %>
-                            <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="d-inline">
-                                <button type="submit" class="btn btn-sm btn-success" title="Rendida / Completada"><i class="bi bi-check-lg"></i></button>
-                            </form>
-                            <form method="POST" action="/recuperaciones/<%= rec.id %>/cancelar" class="d-inline" onsubmit="return confirm('¿Deseas cancelar esta programación de recuperación?')">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Cancelar"><i class="bi bi-x-lg"></i></button>
-                            </form>
+                            <div class="btn-group btn-group-sm">
+                                <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-success" title="Rendida / Presente"><i class="bi bi-check-lg me-1"></i>Rendida</button>
+                                </form>
+                                <form method="POST" action="/recuperaciones/<%= rec.id %>/no-presento" class="d-inline" onsubmit="return confirm('¿Confirmas que el estudiante no se presentó a rendir la recuperación? Se aplicará nota 1.1.')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="No se presentó (Aplica Nota 1.1)"><i class="bi bi-x-circle me-1"></i>Nota 1.1</button>
+                                </form>
+                                <form method="POST" action="/recuperaciones/<%= rec.id %>/cancelar" class="d-inline" onsubmit="return confirm('¿Deseas cancelar esta programación de recuperación?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Anular citación"><i class="bi bi-x-lg"></i></button>
+                                </form>
+                            </div>
                             <% } %>
                         </td>
                         <% } %>
@@ -134,7 +163,9 @@
                             <% if (rec.estado === 'pendiente') { %>
                             <span class="badge bg-warning text-dark">Pendiente</span>
                             <% } else if (rec.estado === 'completada') { %>
-                            <span class="badge bg-success">Completada</span>
+                            <span class="badge bg-success">Rendida</span>
+                            <% } else if (rec.estado === 'no_presento') { %>
+                            <span class="badge bg-danger">No se presentó (Nota 1.1)</span>
                             <% } else { %>
                             <span class="badge bg-secondary">Cancelada</span>
                             <% } %>
@@ -155,6 +186,11 @@
                             %>
                             <% if (esInjustMob) { %>
                                 <span class="badge bg-danger">70% Injustificada</span>
+                                <% if (current_user.rol === 'inspe') { %>
+                                <button type="button" class="btn btn-outline-success btn-sm py-0 px-2" style="font-size:0.7rem;" data-bs-toggle="modal" data-bs-target="#modalJustificar<%= rec.id %>">
+                                    <i class="bi bi-file-earmark-medical me-1"></i>Acreditar Médico (60%)
+                                </button>
+                                <% } %>
                             <% } else if (esSalidaMob) { %>
                                 <span class="badge bg-info text-dark">60% Salida Pedagógica</span>
                             <% } else { %>
@@ -167,9 +203,12 @@
                         </div>
                         <% } %>
                         <% if (rec.estado === 'pendiente' && ['inspe','profe'].includes(current_user.rol)) { %>
-                        <div class="d-flex gap-2 mt-2 pt-2 border-top">
+                        <div class="d-flex flex-wrap gap-2 mt-2 pt-2 border-top">
                             <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="flex-grow-1">
-                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-check-lg me-1"></i>Completar</button>
+                                <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-check-lg me-1"></i>Rendida</button>
+                            </form>
+                            <form method="POST" action="/recuperaciones/<%= rec.id %>/no-presento" class="flex-grow-1" onsubmit="return confirm('¿Confirmas que el alumno no se presentó? Se aplicará nota 1.1.')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-x-circle me-1"></i>Nota 1.1</button>
                             </form>
                             <form method="POST" action="/recuperaciones/<%= rec.id %>/cancelar" onsubmit="return confirm('¿Cancelar esta recuperación?')">
                                 <button type="submit" class="btn btn-sm btn-outline-secondary" title="Cancelar"><i class="bi bi-x-lg"></i></button>
@@ -185,12 +224,62 @@
         <div class="text-center py-5 text-muted">
             <i class="bi bi-check-circle display-1 text-success"></i>
             <p class="mt-3">No hay recuperaciones en esta categoría.</p>
-            <% if (current_user.rol === 'inspe') { %>
+            <% if (['profe'].includes(current_user.rol)) { %>
             <a href="/recuperaciones/crear" class="btn btn-warning"><i class="bi bi-plus-circle me-1"></i>Asignar nueva recuperación</a>
             <% } %>
         </div>
         <% } %>
     </div>
 </div>
+
+<!-- Modales de Justificación Médica para Inspectoría -->
+<% if (current_user && current_user.rol === 'inspe') { %>
+    <% recuperaciones.forEach(rec => { %>
+        <% if (Number(rec.porcentaje_exigencia) >= 70) { %>
+        <div class="modal fade" id="modalJustificar<%= rec.id %>" tabindex="-1" aria-labelledby="modalJustLabel<%= rec.id %>" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow">
+                    <form method="POST" action="/recuperaciones/<%= rec.id %>/justificar-medico">
+                        <div class="modal-header bg-success text-white py-3">
+                            <h6 class="modal-title mb-0 fw-bold" id="modalJustLabel<%= rec.id %>">
+                                <i class="bi bi-file-earmark-medical me-2"></i>Acreditar Certificado Médico en Inspectoría
+                            </h6>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="alert alert-info py-2 small mb-3">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Al ingresar el comprobante médico, <strong>la exigencia del estudiante se rebajará automáticamente del 70% al 60%</strong> reglamentario.
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Estudiante:</label>
+                                <div class="form-control-plaintext py-0 fw-semibold"><%= rec.alumno ? rec.alumno.nombre_completo : 'Estudiante' %> (<%= rec.alumno && rec.alumno.curso ? rec.alumno.curso.nombre : '' %>)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Evaluación Original:</label>
+                                <div class="form-control-plaintext py-0 text-muted"><%= rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' %></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Número de Folio / Licencia Médica <span class="text-danger">*</span></label>
+                                <input type="text" name="folio" class="form-control form-control-sm" required placeholder="Ej: MED-2026-9812 o N° Certificado">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">Diagnóstico / Observación de Inspectoría</label>
+                                <textarea name="diagnostico" class="form-control form-control-sm" rows="2" placeholder="Ej: Reposo médico 48 hrs acreditado por médico tratante..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer py-2 bg-light">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-success btn-sm px-3">
+                                <i class="bi bi-check-circle me-1"></i>Acreditar Justificativo (Bajar a 60%)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <% } %>
+    <% }) %>
+<% } %>
 
 <%- include('../partials/footer') %>

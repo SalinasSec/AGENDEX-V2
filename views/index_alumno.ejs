@@ -1,9 +1,106 @@
 <%- include('partials/header', { title: 'Mi Panel', active: 'dashboard' }) %>
 
-<div class="alert alert-info">
+<div class="alert alert-info py-2 mb-3">
     <i class="bi bi-info-circle me-2"></i>
-    Bienvenido, <strong><%= current_user.nombre %></strong>. Desde aquí puedes consultar tus evaluaciones y recuperaciones.
+    Bienvenido(a), <strong><%= current_user.nombre %></strong>. Panel oficial de evaluaciones y recuperaciones del Liceo Industrial RBL.
 </div>
+
+<% if (typeof recuperaciones_pendientes !== 'undefined' && recuperaciones_pendientes.length > 0) { %>
+<div class="card border-warning shadow-sm mb-4">
+    <div class="card-header bg-warning bg-opacity-10 border-warning py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark fs-6"><i class="bi bi-bell-fill me-1"></i>Notificación Oficial</span>
+            <h5 class="mb-0 fw-bold text-dark">Tienes <%= recuperaciones_pendientes.length %> Evaluación(es) Recuperativa(s) por Rendir</h5>
+        </div>
+        <span class="badge bg-danger fs-6 px-3 py-1">Atención Requerida</span>
+    </div>
+    <div class="card-body p-3 p-md-4">
+        <p class="text-muted small mb-3">
+            <i class="bi bi-info-circle me-1 text-primary"></i>
+            Registraste inasistencia a una o más evaluaciones regulares. A continuación se detallan las fechas, asignaturas, docentes y exigencias reglamentarias con las que deberás rendir tu prueba:
+        </p>
+
+        <div class="row g-3">
+            <% recuperaciones_pendientes.forEach(rec => { %>
+            <div class="col-12 col-lg-6">
+                <div class="p-3 rounded border border-2 border-warning-subtle bg-white h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <span class="badge" style="background:<%= rec.evaluacion && rec.evaluacion.asignatura ? rec.evaluacion.asignatura.color : '#14213D' %>;">
+                                <%= rec.evaluacion && rec.evaluacion.asignatura ? rec.evaluacion.asignatura.nombre : 'General' %>
+                            </span>
+                            <span class="badge bg-<%= rec.aviso_clase || 'primary' %> py-1 px-2 fw-semibold"><%= rec.aviso_tiempo || 'Pendiente' %></span>
+                        </div>
+                        <h6 class="fw-bold mb-1 text-dark"><%= rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación Original' %></h6>
+                        <div class="small text-muted mb-2">
+                            <i class="bi bi-calendar-event me-1"></i>Evaluación regular: <%= rec.evaluacion ? rec.evaluacion.fecha : '-' %>
+                        </div>
+
+                        <div class="p-2 rounded bg-light border small mb-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted"><i class="bi bi-calendar-check text-primary me-1"></i><strong>Fecha Programada:</strong></span>
+                                <strong class="text-primary fs-6"><%= rec.fecha_recuperacion %></strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted"><i class="bi bi-person text-secondary me-1"></i><strong>Profesor(a):</strong></span>
+                                <span><%= rec.evaluacion && rec.evaluacion.profesor ? rec.evaluacion.profesor.nombre_completo : 'Docente Asignado' %></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted"><i class="bi bi-shield-check text-success me-1"></i><strong>Exigencia:</strong></span>
+                                <% if (Number(rec.porcentaje_exigencia) === 60) { %>
+                                <span class="badge bg-success" title="Inasistencia justificada reglamentariamente">60% (Justificado)</span>
+                                <% } else { %>
+                                <span class="badge bg-danger" title="Inasistencia sin justificar oficial">70% (Injustificada)</span>
+                                <% } %>
+                            </div>
+                            <% if (rec.motivo) { %>
+                            <div class="mt-2 pt-1 border-top text-muted">
+                                <strong>Justificativo:</strong> <%= rec.motivo %>
+                            </div>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="alert alert-light border border-info-subtle small mb-2 py-2">
+                        <i class="bi bi-geo-alt-fill text-primary me-1"></i>
+                        <strong>Instrucción:</strong> Preséntate en sala con tu profesor(a) para coordinar la toma de la prueba en la fecha indicada.
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modalCitacion<%= rec.id %>">
+                        <i class="bi bi-file-earmark-text me-1"></i>Ver Comprobante de Citación Oficial
+                    </button>
+                </div>
+            </div>
+            <% }) %>
+        </div>
+    </div>
+</div>
+<% } %>
+
+<% if (typeof inasistencias !== 'undefined' && inasistencias.length > 0) { %>
+<div class="alert alert-light border border-warning-subtle mb-4 py-3">
+    <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-clock-history text-warning fs-4 mt-1"></i>
+        <div>
+            <h6 class="fw-bold mb-1">Historial de Inasistencias a Evaluaciones</h6>
+            <p class="small text-muted mb-2">Tienes inasistencia registrada en las siguientes evaluaciones. Si amerita justificativo médico o de fuerza mayor, debes presentarlo en Inspectoría General a la brevedad:</p>
+            <div class="d-flex flex-wrap gap-2">
+                <% inasistencias.forEach(inas => { %>
+                <span class="badge bg-light text-dark border p-2">
+                    <span class="badge me-1" style="background:<%= inas.asignatura ? inas.asignatura.color : '#14213D' %>;"><%= inas.asignatura ? inas.asignatura.nombre : 'General' %></span>
+                    <%= inas.eval_titulo %> (<%= inas.eval_fecha %>) &mdash;
+                    <% if (inas.estado_asistencia === 'justificado') { %>
+                    <span class="text-success fw-bold"><i class="bi bi-check-circle me-1"></i>Justificado por Inspectoría</span>
+                    <% } else if (inas.estado_asistencia === 'salida') { %>
+                    <span class="text-info text-dark fw-bold"><i class="bi bi-bus-front me-1"></i>Salida Pedagógica</span>
+                    <% } else { %>
+                    <span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle me-1"></i>Sin Justificar (70% exigencia)</span>
+                    <% } %>
+                </span>
+                <% }) %>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
 
 <div class="row g-3 mb-4">
     <div class="col-md-4">
@@ -81,20 +178,40 @@
                 <% if (mis_recuperaciones.length > 0) { %>
                 <div class="list-group list-group-flush mb-3">
                     <% mis_recuperaciones.forEach(rec => { %>
-                    <div class="list-group-item px-0">
-                        <div class="d-flex justify-content-between align-items-start">
+                    <div class="list-group-item px-0 py-3 border-bottom">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
-                                <strong class="small"><%= rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' %></strong>
-                                <br><small class="text-muted">Fecha: <%= rec.fecha_recuperacion %></small>
-                                <br><small class="text-info">Exigencia: <%= rec.porcentaje_exigencia %>%</small>
+                                <span class="badge mb-1" style="background:<%= rec.evaluacion && rec.evaluacion.asignatura ? rec.evaluacion.asignatura.color : '#14213D' %>;">
+                                    <%= rec.evaluacion && rec.evaluacion.asignatura ? rec.evaluacion.asignatura.nombre : 'General' %>
+                                </span>
+                                <div class="fw-bold small"><%= rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación' %></div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-calendar-event me-1"></i>Rendir: <strong><%= rec.fecha_recuperacion %></strong>
+                                    <% if (rec.aviso_tiempo) { %>
+                                    <span class="badge bg-<%= rec.aviso_clase || 'primary' %> ms-1 py-0 px-2" style="font-size:0.75rem;"><%= rec.aviso_tiempo %></span>
+                                    <% } %>
+                                </div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-person me-1"></i><%= rec.evaluacion && rec.evaluacion.profesor ? rec.evaluacion.profesor.nombre_completo : 'Docente' %>
+                                </div>
+                                <div class="small">
+                                    <span class="text-muted">Exigencia:</span>
+                                    <% if (Number(rec.porcentaje_exigencia) === 60) { %>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">60% (Justificado)</span>
+                                    <% } else { %>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">70% (Injustificada)</span>
+                                    <% } %>
+                                </div>
                             </div>
-                            <% if (rec.estado === 'pendiente') { %>
-                            <span class="badge bg-warning text-dark">Pendiente</span>
-                            <% } else if (rec.estado === 'completada') { %>
-                            <span class="badge bg-success">Completada</span>
-                            <% } else { %>
-                            <span class="badge bg-secondary">Cancelada</span>
-                            <% } %>
+                            <div>
+                                <% if (rec.estado === 'pendiente') { %>
+                                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Pendiente</span>
+                                <% } else if (rec.estado === 'completada') { %>
+                                <span class="badge bg-success"><i class="bi bi-check2-circle me-1"></i>Rendida</span>
+                                <% } else { %>
+                                <span class="badge bg-secondary">Cancelada</span>
+                                <% } %>
+                            </div>
                         </div>
                     </div>
                     <% }) %>
@@ -109,5 +226,89 @@
         </div>
     </div>
 </div>
+
+<!-- Modales de Citación Oficial para cada Recuperación Pendiente -->
+<% if (typeof recuperaciones_pendientes !== 'undefined' && recuperaciones_pendientes.length > 0) { %>
+    <% recuperaciones_pendientes.forEach(rec => { %>
+    <div class="modal fade" id="modalCitacion<%= rec.id %>" tabindex="-1" aria-labelledby="modalCitacionLabel<%= rec.id %>" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white py-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-shield-check text-warning fs-5"></i>
+                        <div>
+                            <h6 class="modal-title mb-0 fw-bold" id="modalCitacionLabel<%= rec.id %>">Citación Oficial a Evaluación Recuperativa</h6>
+                            <small class="text-white-50">Liceo Industrial Bicentenario RBL</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="text-center mb-3 pb-3 border-bottom">
+                        <span class="badge bg-primary px-3 py-1 fs-6 mb-2">Comprobante de Notificación Académica</span>
+                        <h5 class="fw-bold text-dark mb-1"><%= rec.evaluacion ? rec.evaluacion.titulo : 'Evaluación Pendiente' %></h5>
+                        <div class="text-muted small">
+                            <%= rec.evaluacion && rec.evaluacion.asignatura ? rec.evaluacion.asignatura.nombre : 'Asignatura Oficial' %>
+                        </div>
+                    </div>
+
+                    <div class="bg-light p-3 rounded border mb-3">
+                        <div class="row g-2 small">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Estudiante:</span>
+                                <strong><%= alumno ? alumno.nombre_completo : current_user.nombre %></strong>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">RUT:</span>
+                                <strong class="font-monospace"><%= alumno ? alumno.rut : current_user.rut %></strong>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Curso:</span>
+                                <strong><%= alumno && alumno.curso ? alumno.curso.nombre : 'Curso' %></strong>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Profesor a Cargo:</span>
+                                <strong><%= rec.evaluacion && rec.evaluacion.profesor ? rec.evaluacion.profesor.nombre_completo : 'Docente' %></strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-primary-subtle bg-primary bg-opacity-10 mb-3">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold text-primary mb-2"><i class="bi bi-calendar-check me-2"></i>Detalles de Rendición</h6>
+                            <ul class="list-unstyled mb-0 small">
+                                <li class="mb-1"><strong>Fecha de Rendición:</strong> <%= rec.fecha_recuperacion %></li>
+                                <li class="mb-1"><strong>Evaluación Original Faltada:</strong> <%= rec.evaluacion ? rec.evaluacion.fecha : 'Fecha previa' %></li>
+                                <li class="mb-1">
+                                    <strong>Porcentaje de Exigencia:</strong>
+                                    <% if (Number(rec.porcentaje_exigencia) === 60) { %>
+                                    <span class="badge bg-success">60% (Exigencia Regular - Justificado)</span>
+                                    <% } else { %>
+                                    <span class="badge bg-danger">70% (Escala Diferenciada - Sin Justificar)</span>
+                                    <% } %>
+                                </li>
+                                <% if (rec.motivo) { %>
+                                <li class="mt-2 text-muted"><strong>Observación / Motivo:</strong> <%= rec.motivo %></li>
+                                <% } %>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border small text-muted mb-0">
+                        <i class="bi bi-exclamation-circle text-primary me-1"></i>
+                        Esta citación constituye la notificación formal al alumno y apoderado. Debe presentarse en sala puntualmente en la fecha coordinada con el docente.
+                    </div>
+                </div>
+                <div class="modal-footer py-2 bg-light">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i>Imprimir Comprobante
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <% }) %>
+<% } %>
 
 <%- include('partials/footer') %>

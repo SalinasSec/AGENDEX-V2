@@ -354,8 +354,10 @@ class Store {
       { id: 3, evaluacion_id: 1, alumno_id: 3, presente: true, estado_asistencia: 'presente', motivo: "", justificado: false },
       // Para eval 2 (3G, alumna 4)
       { id: 4, evaluacion_id: 2, alumno_id: 4, presente: false, estado_asistencia: 'justificado', motivo: "Licencia médica acreditada", justificado: true },
+      // Para eval 3 (4G, alumno 1 Joaquín Rivas con justificación médica)
+      { id: 5, evaluacion_id: 3, alumno_id: 1, presente: false, estado_asistencia: 'justificado', motivo: "Licencia médica acreditada en Inspectoría General", justificado: true }
     ];
-    this.asistenciaIdSeq = 5;
+    this.asistenciaIdSeq = 6;
 
     // Recuperaciones iniciales coherentes con alumnos y evaluaciones de los cursos
     this.recuperaciones = [
@@ -391,9 +393,20 @@ class Store {
         porcentaje_exigencia: EXIGENCIA_JUSTIFICADO, // 60% (misma exigencia regular)
         estado: "pendiente",
         created_at: new Date()
+      },
+      {
+        id: 4,
+        evaluacion_id: 3, // Eval 3 en 4G (POO Java)
+        alumno_id: 1, // Joaquín Rivas (4G)
+        fecha_recuperacion: dateOffset(2),
+        motivo: "Licencia médica acreditada en Inspectoría General",
+        tipo_justificacion: "medico",
+        porcentaje_exigencia: EXIGENCIA_JUSTIFICADO, // 60%
+        estado: "pendiente",
+        created_at: new Date()
       }
     ];
-    this.recuperacionIdSeq = 4;
+    this.recuperacionIdSeq = 5;
   }
 
   // Helpers
@@ -634,6 +647,17 @@ class Store {
     const r = this.recuperaciones.find(x => x.id === Number(id));
     if (r) {
       r.estado = estado;
+      return this.enrichRecuperacion(r);
+    }
+    return null;
+  }
+
+  actualizarExigenciaRecuperacion(id, porcentaje, tipo_justificacion, motivo) {
+    const r = this.recuperaciones.find(x => x.id === Number(id));
+    if (r) {
+      r.porcentaje_exigencia = Number(porcentaje);
+      if (tipo_justificacion) r.tipo_justificacion = tipo_justificacion;
+      if (motivo) r.motivo = motivo;
       return this.enrichRecuperacion(r);
     }
     return null;

@@ -167,7 +167,60 @@
 
                 {% elif current_user.rol == 'profe' %}
                     <!-- Profesor -->
-                    {% if ev.asistencia_guardada %}
+                    {% if ev.fecha > hoy %}
+                    <!-- Caso 1: La evaluación es para una fecha futura -->
+                    <div class="alert alert-primary bg-primary bg-opacity-10 border-primary border-opacity-25 py-3 mb-3">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-primary fs-6"><i class="bi bi-calendar-check me-1"></i>Evaluación Calendarizada</span>
+                            <strong class="text-primary">Programada para el {{ ev.fecha }} {{ 'a las ' ~ ev.hora if ev.hora else '' }}</strong>
+                        </div>
+                        <p class="small text-muted mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Esta evaluación se encuentra planificada para una fecha futura. El botón y registro para <strong>Guardar Asistencia</strong> se habilitarán automáticamente el día fijado para la rendición de la prueba. A continuación se visualiza la nómina de estudiantes convocados del curso.
+                        </p>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="min-width: 580px;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th>Alumno</th>
+                                    <th>RUT</th>
+                                    <th class="text-center">Condición Actual</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for alumno in alumnos %}
+                                <tr>
+                                    <td class="text-muted small">{{ loop.index }}</td>
+                                    <td>
+                                        <div class="fw-semibold">{{ alumno.nombre_completo }}</div>
+                                    </td>
+                                    <td class="text-muted small font-monospace">{{ alumno.rut }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-clock text-primary me-1"></i>Convocado(a) a Rendición
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 pt-3 border-top">
+                        <a href="/evaluaciones" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left me-1"></i>Volver a Evaluaciones
+                        </a>
+                        {% if current_user.profesor_id == ev.profesor_id %}
+                        <a href="/evaluaciones/{{ ev.id }}/editar" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-pencil me-1"></i>Editar Evaluación
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    {% elif ev.asistencia_guardada %}
                     <div class="alert alert-success border border-success-subtle py-2 px-3 mb-3">
                         <i class="bi bi-lock-fill text-success me-2"></i>
                         <strong>Asistencia guardada y cerrada:</strong> La lista de asistencia ya fue registrada oficialmente para esta evaluación y no puede ser modificada. Si se requiere justificar a algún alumno ausente, corresponde a Inspectoría General.
@@ -212,6 +265,13 @@
                                         {% else %}
                                         <span class="badge bg-success">60%</span>
                                         {% endif %}
+                                        {% if estado_actual != 'presente' and current_user.rol in ['profe', 'inspe'] %}
+                                        <div class="mt-1">
+                                            <a href="/recuperaciones/crear?evaluacion_id={{ ev.id }}&alumno_id={{ alumno.id }}" class="btn btn-outline-warning btn-sm py-0 px-2" style="font-size: 0.72rem;">
+                                                <i class="bi bi-calendar-plus me-1"></i>Recuperar
+                                            </a>
+                                        </div>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -253,7 +313,7 @@
                                                 <input type="hidden" name="estado_{{ alumno.id }}" value="justificado">
                                             </div>
                                             {% else %}
-                                            <select name="estado_{{ alumno.id }}" class="form-select form-select-sm">
+                                            <select name="estado_{{ alumno.id }}" class="form-select form-select-sm select-estado" data-alumno-id="{{ alumno.id }}">
                                                 <option value="presente" {{ 'selected' if estado_actual == 'presente' else '' }}>✅ Asistente</option>
                                                 <option value="injustificada" {{ 'selected' if estado_actual == 'injustificada' else '' }}>❌ No Asiste</option>
                                                 <option value="salida" {{ 'selected' if estado_actual == 'salida' else '' }}>🚌 Salida Pedagógica</option>
@@ -261,11 +321,12 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <input type="text" name="motivo_{{ alumno.id }}" class="form-control form-control-sm"
+                                            <input type="text" name="motivo_{{ alumno.id }}" id="motivo_{{ alumno.id }}" class="form-control form-control-sm"
                                                    placeholder="Observación..."
-                                                   value="{{ asist.motivo if asist and asist.motivo else '' }}">
+                                                   value="{{ asist.motivo if asist and asist.motivo else '' }}"
+                                                   {{ 'disabled' if estado_actual == 'presente' else '' }}>
                                         </td>
-                                        <td class="text-center">
+                                        <td class="text-center" id="badge_exigencia_{{ alumno.id }}">
                                             {% if estado_actual == 'presente' %}
                                             <span class="text-muted small">&mdash;</span>
                                             {% elif estado_actual == 'injustificada' %}
@@ -343,5 +404,39 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.select-estado').forEach(sel => {
+        sel.addEventListener('change', function() {
+            const alumnoId = this.getAttribute('data-alumno-id');
+            const motivoInput = document.getElementById('motivo_' + alumnoId);
+            const badgeContainer = document.getElementById('badge_exigencia_' + alumnoId);
+            const val = this.value;
+
+            if (val === 'presente') {
+                if (motivoInput) {
+                    motivoInput.disabled = true;
+                    motivoInput.value = '';
+                }
+                if (badgeContainer) badgeContainer.innerHTML = '<span class="text-muted small">&mdash;</span>';
+            } else {
+                if (motivoInput) {
+                    motivoInput.disabled = false;
+                }
+                if (badgeContainer) {
+                    if (val === 'injustificada') {
+                        badgeContainer.innerHTML = '<span class="badge bg-danger" title="70% de exigencia">70%</span>';
+                    } else if (val === 'salida') {
+                        badgeContainer.innerHTML = '<span class="badge bg-info text-dark" title="60% regular">60%</span>';
+                    } else {
+                        badgeContainer.innerHTML = '<span class="badge bg-success" title="60% regular">60%</span>';
+                    }
+                }
+            }
+        });
+    });
+});
+</script>
 
 {% endblock %}

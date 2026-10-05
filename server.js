@@ -105,6 +105,110 @@ app.use((req, res, next) => {
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
   res.locals.today_formatted = d.toLocaleDateString('es-CL', options);
 
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  res.locals.today_str = todayStr;
+  res.locals.hoy = todayStr;
+
+  // Sistema de Notificaciones dinámicas según rol y usuario
+  const notificaciones = [];
+  if (req.session.user) {
+    const u = req.session.user;
+    if (u.rol === 'alumno') {
+      const aId = u.alumno_id || (store.alumnos.find(a => a.rut === u.rut)?.id) || 1;
+      if (aId) {
+        // 1. Notificaciones de pruebas recuperativas asignadas
+        const recs = store.getRecuperacionesByAlumno(aId).filter(r => r.estado === 'pendiente');
+        recs.forEach(r => {
+          const ev = r.evaluacion || store.getEvaluacion(r.evaluacion_id);
+          const asig = ev && ev.asignatura ? ev.asignatura.nombre : 'Asignatura';
+          const prof = ev && ev.profesor ? ev.profesor.nombre_completo : 'Docente';
+          const isToday = r.fecha_recuperacion === todayStr;
+          const isTomorrow = (() => {
+            const tm = new Date();
+            tm.setDate(tm.getDate() + 1);
+            return r.fecha_recuperacion === `${tm.getFullYear()}-${pad(tm.getMonth() + 1)}-${pad(tm.getDate())}`;
+          })();
+
+          let urgencia = 'warning';
+          let timeBadge = `Rinde el ${r.fecha_recuperacion}`;
+          if (isToday) {
+            urgencia = 'danger';
+            timeBadge = '¡RINDE HOY!';
+          } else if (isTomorrow) {
+            urgencia = 'warning';
+            timeBadge = 'Rinde Mañana';
+          }
+
+          notificaciones.push({
+            id: `rec-${r.id}`,
+            tipo: 'recuperacion',
+            urgencia,
+            titulo: `Prueba Recuperativa: ${asig}`,
+            detalle: `Citación fijada para el ${r.fecha_recuperacion} con ${prof}. Exigencia reglamentaria: ${Math.round(r.porcentaje_exigencia)}%.`,
+            tiempo: timeBadge,
+            link: '/recuperaciones',
+            icono: 'bi-bell-fill'
+          });
+        });
+
+        // 2. Notificaciones de inasistencias registradas sin justificar
+        const asists = store.getAsistenciasByAlumno(aId);
+        const inasistenciasSinJust = asists.filter(a => a.estado_asistencia === 'injustificada');
+        inasistenciasSinJust.forEach(a => {
+          const ev = store.getEvaluacion(a.evaluacion_id);
+          const asig = ev && ev.asignatura ? ev.asignatura.nombre : 'Evaluación';
+          notificaciones.push({
+            id: `asist-${a.id}`,
+            tipo: 'inasistencia',
+            urgencia: 'warning',
+            titulo: `Inasistencia Registrada: ${asig}`,
+            detalle: `Evaluación regular del ${ev ? ev.fecha : 'fecha pasada'}. Presenta tu certificado médico en Inspectoría General para regularizar exigencia al 60%.`,
+            tiempo: 'Justificación Pendiente',
+            link: '/',
+            icono: 'bi-exclamation-triangle-fill'
+          });
+        });
+      }
+    } else if (u.rol === 'profe') {
+      const pId = u.profesor_id;
+      const evalsHoy = store.evaluaciones.filter(e => {
+        if (e.fecha !== todayStr) return false;
+        if (pId && e.profesor_id !== pId) return false;
+        return !e.asistencia_guardada;
+      });
+      evalsHoy.forEach(e => {
+        const enriched = store.getEvaluacion(e.id);
+        notificaciones.push({
+          id: `eval-asist-${e.id}`,
+          tipo: 'asistencia_pendiente',
+          urgencia: 'primary',
+          titulo: `Pase de lista pendiente: ${e.titulo}`,
+          detalle: `Evaluación programada para hoy en curso ${enriched.curso ? enriched.curso.nombre : ''}. Recuerda pasar lista.`,
+          tiempo: 'Hoy',
+          link: `/evaluaciones/${e.id}`,
+          icono: 'bi-clipboard-check'
+        });
+      });
+    } else if (u.rol === 'inspe') {
+      const asistInjust = store.asistencias.filter(a => a.estado_asistencia === 'injustificada');
+      if (asistInjust.length > 0) {
+        notificaciones.push({
+          id: 'inspe-inasist',
+          tipo: 'justificaciones',
+          urgencia: 'warning',
+          titulo: `${asistInjust.length} inasistencia(s) por justificar`,
+          detalle: 'Hay inasistencias a evaluaciones pendientes de verificación médica o salida pedagógica.',
+          tiempo: 'Pendiente',
+          link: '/evaluaciones',
+          icono: 'bi-shield-check'
+        });
+      }
+    }
+  }
+  res.locals.notificaciones_usuario = notificaciones;
+  res.locals.notificaciones_count = notificaciones.length;
+
   req.flash = (categoria, texto) => {
     if (!req.session.flash) req.session.flash = [];
     req.session.flash.push({
@@ -260,7 +364,43 @@ app.get('/', requireAuth, (req, res) => {
     });
 
     const misAsistencias = alumno ? store.getAsistenciasByAlumno(alumno.id) : [];
-    const recsAl = alumno ? store.getRecuperacionesByAlumno(alumno.id) : [];
+    const inasistencias = misAsistencias
+      .filter(a => a.estado_asistencia !== 'presente')
+      .map(a => {
+        const ev = store.getEvaluacion(a.evaluacion_id);
+        return {
+          ...a,
+          eval_titulo: ev ? ev.titulo : 'Evaluación',
+          eval_fecha: ev ? ev.fecha : '',
+          asignatura: ev ? ev.asignatura : { nombre: 'General', color: '#14213D' }
+        };
+      });
+
+    const recsAl = (alumno ? store.getRecuperacionesByAlumno(alumno.id) : []).map(r => {
+      let aviso_tiempo = '';
+      let aviso_clase = 'primary';
+      if (r.fecha_recuperacion === hoy) {
+        aviso_tiempo = '¡Rinde Hoy!';
+        aviso_clase = 'danger';
+      } else if (r.fecha_recuperacion > hoy) {
+        const diffDays = Math.round((new Date(r.fecha_recuperacion) - new Date(hoy)) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          aviso_tiempo = 'Rinde Mañana';
+          aviso_clase = 'warning text-dark';
+        } else {
+          aviso_tiempo = `En ${diffDays} días`;
+          aviso_clase = 'primary';
+        }
+      } else {
+        aviso_tiempo = 'Fecha cumplida';
+        aviso_clase = 'secondary';
+      }
+      return {
+        ...r,
+        aviso_tiempo,
+        aviso_clase
+      };
+    });
     const recsPendientes = recsAl.filter(r => r.estado === 'pendiente');
 
     return res.render('index_alumno', {
@@ -275,6 +415,8 @@ app.get('/', requireAuth, (req, res) => {
       mis_evals: misEvals,
       today: hoy,
       mis_recuperaciones: recsAl,
+      recuperaciones_pendientes: recsPendientes,
+      inasistencias,
       mis_asistencias: misAsistencias
     });
   }
@@ -602,80 +744,108 @@ app.post('/evaluaciones/:id/eliminar', requireAuth, (req, res) => {
   res.redirect('/evaluaciones');
 });
 
+// Redirigir GET de asistencia a la vista principal de la evaluación
+app.get('/evaluaciones/:id/asistencia', requireAuth, (req, res) => {
+  res.redirect(`/evaluaciones/${req.params.id}`);
+});
+
 // Guardar Asistencia
 app.post('/evaluaciones/:id/asistencia', requireAuth, requireRole('profe', 'utp', 'inspe'), (req, res) => {
-  const evalId = Number(req.params.id);
-  const ev = store.getEvaluacionById(evalId);
+  try {
+    const evalId = Number(req.params.id);
+    const ev = store.getEvaluacionById(evalId);
 
-  if (!ev) {
-    req.flash('danger', 'Evaluación no encontrada.');
-    return res.redirect('/evaluaciones');
-  }
-
-  const user = req.session.user;
-  const isInspector = (user.rol === 'inspe');
-  const isProfesor = (user.rol === 'profe');
-  const isUtp = (user.rol === 'utp');
-
-  // Si la asistencia ya está guardada y bloqueada:
-  // Un profesor ya no puede volver a cambiar la asistencia una vez guardada.
-  if (ev.asistencia_guardada && isProfesor) {
-    req.flash('warning', 'La asistencia para esta evaluación ya fue guardada y no puede ser modificada por el profesor. Cualquier ajuste posterior corresponde a Inspectoría General.');
-    return res.redirect(`/evaluaciones/${evalId}`);
-  }
-
-  const alumnos = store.getAlumnosByCurso(ev.curso_id);
-
-  alumnos.forEach(alumno => {
-    const estadoEnviado = req.body[`estado_${alumno.id}`];
-    const motivo = req.body[`motivo_${alumno.id}`] || '';
-    const existing = store.getAsistencia(alumno.id, evalId);
-
-    // Si inspectoría está guardando y este alumno no vino en el formulario (por ejemplo si ya estaba presente)
-    if (isInspector && !estadoEnviado) {
-      return;
+    if (!ev) {
+      req.flash('danger', 'Evaluación no encontrada.');
+      return res.redirect('/evaluaciones');
     }
 
-    let estadoFinal = 'presente';
-    if (isInspector) {
-      // Inspectoría tiene atribución para justificar o registrar salida pedagógica / inasistencia
-      estadoFinal = estadoEnviado || (existing ? existing.estado_asistencia : 'injustificada');
-    } else {
-      // Si es Profesor: marca 'presente', 'injustificada' o 'salida' (salida pedagógica).
-      // Si el alumno ya contaba con 'justificado' médica por Inspectoría, se respeta
-      if (estadoEnviado === 'presente') {
-        estadoFinal = 'presente';
-      } else if (estadoEnviado === 'salida') {
-        estadoFinal = 'salida';
+    const user = req.session.user;
+    const isInspector = (user.rol === 'inspe');
+    const isProfesor = (user.rol === 'profe');
+
+    // Si la asistencia ya está guardada y bloqueada:
+    // Un profesor ya no puede volver a cambiar la asistencia una vez guardada.
+    if (ev.asistencia_guardada && isProfesor) {
+      req.flash('warning', 'La asistencia para esta evaluación ya fue guardada y no puede ser modificada por el profesor. Cualquier ajuste posterior corresponde a Inspectoría General.');
+      return res.redirect(`/evaluaciones/${evalId}`);
+    }
+
+    const alumnos = store.getAlumnosByCurso(ev.curso_id);
+
+    alumnos.forEach(alumno => {
+      const estadoEnviado = req.body[`estado_${alumno.id}`];
+      const motivo = req.body[`motivo_${alumno.id}`] || '';
+      const existing = store.getAsistencia(alumno.id, evalId);
+
+      // Si inspectoría está guardando y este alumno no vino en el formulario (por ejemplo si ya estaba presente)
+      if (isInspector && !estadoEnviado) {
+        return;
+      }
+
+      let estadoFinal = 'presente';
+      if (isInspector) {
+        // Inspectoría tiene atribución para justificar o registrar salida pedagógica / inasistencia
+        estadoFinal = estadoEnviado || (existing ? existing.estado_asistencia : 'injustificada');
       } else {
-        if (existing && existing.estado_asistencia === 'justificado') {
-          estadoFinal = 'justificado';
+        // Si es Profesor: marca 'presente', 'injustificada' o 'salida' (salida pedagógica).
+        // Si el alumno ya contaba con 'justificado' médica por Inspectoría, se respeta
+        if (estadoEnviado === 'presente') {
+          estadoFinal = 'presente';
+        } else if (estadoEnviado === 'salida') {
+          estadoFinal = 'salida';
         } else {
-          estadoFinal = 'injustificada';
+          if (existing && existing.estado_asistencia === 'justificado') {
+            estadoFinal = 'justificado';
+          } else {
+            estadoFinal = 'injustificada';
+          }
         }
       }
-    }
 
-    const presente = (estadoFinal === 'presente');
-    const justificado = (estadoFinal === 'justificado' || estadoFinal === 'salida');
+      const presente = (estadoFinal === 'presente');
+      const justificado = (estadoFinal === 'justificado' || estadoFinal === 'salida');
 
-    store.guardarAsistencia({
-      alumno_id: alumno.id,
-      evaluacion_id: evalId,
-      presente,
-      estado_asistencia: estadoFinal,
-      motivo: presente ? '' : motivo,
-      justificado
+      store.guardarAsistencia({
+        alumno_id: alumno.id,
+        evaluacion_id: evalId,
+        presente,
+        estado_asistencia: estadoFinal,
+        motivo: presente ? '' : motivo,
+        justificado
+      });
+
+      // Sincronizar automáticamente cualquier recuperación existente del alumno para esta prueba
+      const recExistente = store.recuperaciones.find(r => r.alumno_id === alumno.id && r.evaluacion_id === evalId);
+      if (recExistente) {
+        if (estadoFinal === 'justificado' || estadoFinal === 'salida') {
+          recExistente.porcentaje_exigencia = 60.0;
+          recExistente.tipo_justificacion = (estadoFinal === 'salida' ? 'salida_pedagogica' : 'medico');
+          if (motivo) {
+            recExistente.motivo = `[${estadoFinal === 'salida' ? 'Salida Pedagógica' : 'Certificado Médico'}] ${motivo}`;
+          }
+        } else if (estadoFinal === 'injustificada') {
+          recExistente.porcentaje_exigencia = 70.0;
+          recExistente.tipo_justificacion = 'injustificada';
+          if (motivo) {
+            recExistente.motivo = `[Injustificada] ${motivo}`;
+          }
+        }
+      }
     });
-  });
 
-  // Marcar la evaluación como que ya tiene su asistencia oficial guardada
-  store.actualizarEvaluacion(evalId, { asistencia_guardada: true });
+    // Marcar la evaluación como que ya tiene su asistencia oficial guardada
+    store.actualizarEvaluacion(evalId, { asistencia_guardada: true });
 
-  req.flash('success', isProfesor 
-    ? 'Asistencia guardada exitosamente. Ha quedado registrada y cerrada para el curso.' 
-    : 'Registro de asistencia e inasistencias actualizado correctamente.');
-  res.redirect(`/evaluaciones/${evalId}`);
+    req.flash('success', isProfesor 
+      ? 'Asistencia guardada exitosamente. Ha quedado registrada y cerrada para el curso.' 
+      : 'Registro de asistencia e inasistencias actualizado correctamente.');
+    res.redirect(`/evaluaciones/${evalId}`);
+  } catch (err) {
+    console.error('Error procesando asistencia:', err);
+    req.flash('danger', 'Error al procesar la asistencia.');
+    res.redirect(`/evaluaciones/${req.params.id}`);
+  }
 });
 
 // -------------------------------------------------------------
@@ -895,10 +1065,54 @@ app.post('/recuperaciones/crear', requireAuth, requireRole('inspe', 'profe'), (r
   res.redirect('/recuperaciones');
 });
 
-app.post('/recuperaciones/:id/completar', requireAuth, requireRole('utp', 'profe', 'inspe'), (req, res) => {
+app.post('/recuperaciones/:id/completar', requireAuth, requireRole('profe', 'inspe'), (req, res) => {
   const id = Number(req.params.id);
-  store.actualizarEstadoRecuperacion(id, 'completada');
-  req.flash('success', 'Recuperación marcada como completada.');
+  const r = store.actualizarEstadoRecuperacion(id, 'completada');
+  const al = r && r.alumno ? r.alumno.nombre_completo : 'El estudiante';
+  req.flash('success', `Evaluación recuperativa rendida y completada con éxito por ${al}.`);
+  res.redirect(req.get('Referrer') || '/recuperaciones');
+});
+
+// Registrar inasistencia definitiva a la prueba recuperativa (Aplica nota 1.1)
+app.post('/recuperaciones/:id/no-presento', requireAuth, requireRole('profe', 'inspe'), (req, res) => {
+  const id = Number(req.params.id);
+  const r = store.actualizarEstadoRecuperacion(id, 'no_presento');
+  if (r) {
+    r.observacion_cierre = 'Estudiante no se presentó a rendir la evaluación recuperativa. Se aplica calificación mínima reglamentaria 1.1 según manual institucional.';
+  }
+  const al = r && r.alumno ? r.alumno.nombre_completo : 'El estudiante';
+  req.flash('warning', `Recuperación cerrada: ${al} no se presentó a rendir la prueba. Se registra nota mínima 1.1.`);
+  res.redirect(req.get('Referrer') || '/recuperaciones');
+});
+
+// Inspectoría acredita certificado médico y rebaja exigencia de 70% a 60%
+app.post('/recuperaciones/:id/justificar-medico', requireAuth, requireRole('inspe'), (req, res) => {
+  const id = Number(req.params.id);
+  const { folio, diagnostico } = req.body;
+  const rec = store.recuperaciones.find(r => r.id === id);
+
+  if (!rec) {
+    req.flash('danger', 'Recuperación no encontrada.');
+    return res.redirect('/recuperaciones');
+  }
+
+  const detalleMotivo = `[Certificado Médico] Folio ${folio || 'S/N'}${diagnostico ? ' - ' + diagnostico : ''} (Acreditado por Inspectoría General)`;
+  
+  // Rebajar exigencia automáticamente al 60%
+  rec.porcentaje_exigencia = 60.0;
+  rec.tipo_justificacion = 'medico';
+  rec.motivo = detalleMotivo;
+
+  // Sincronizar asistencia de la evaluación
+  const asist = store.getAsistencia(rec.alumno_id, rec.evaluacion_id);
+  if (asist) {
+    asist.justificado = true;
+    asist.estado_asistencia = 'justificado';
+    asist.motivo = detalleMotivo;
+  }
+
+  const al = store.getAlumnoById(rec.alumno_id);
+  req.flash('success', `Certificado médico folio ${folio || 'S/N'} acreditado para ${al ? al.nombre_completo : 'el alumno'}. La exigencia se rebajó automáticamente del 70% al 60%.`);
   res.redirect(req.get('Referrer') || '/recuperaciones');
 });
 
