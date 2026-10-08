@@ -44,7 +44,9 @@
                                 <th class="nowrap" style="min-width: 110px;">F. Recuperación</th>
                                 <th class="nowrap" style="min-width: 85px;">Exigencia</th>
                                 <th style="min-width: 120px;">Motivo</th>
-                                <th class="text-end nowrap" style="min-width: 100px;">Acción</th>
+                                <th class="text-end nowrap" style="min-width: 130px;">
+                                    <%= (current_user && current_user.rol === 'inspe') ? 'Acreditación Médica' : 'Acción Docente' %>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -62,9 +64,23 @@
                                 </td>
                                 <td class="small text-muted"><%= rec.motivo || '-' %></td>
                                 <td class="text-end nowrap">
+                                    <% if (current_user && current_user.rol === 'profe') { %>
                                     <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-success" title="Marcar completada"><i class="bi bi-check-lg me-1"></i>Completar</button>
+                                        <button type="submit" class="btn btn-sm btn-success" title="Marcar como rendida en sala"><i class="bi bi-check-lg me-1"></i>Rendida</button>
                                     </form>
+                                    <% } else if (current_user && current_user.rol === 'inspe') { %>
+                                        <% if (Number(rec.porcentaje_exigencia) >= 70) { %>
+                                        <a href="/recuperaciones?tipo=pendientes_medico" class="btn btn-sm btn-outline-success">
+                                            <i class="bi bi-file-earmark-medical me-1"></i>Acreditar Médico
+                                        </a>
+                                        <% } else { %>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                            <i class="bi bi-check-circle me-1"></i>Acreditado (60%)
+                                        </span>
+                                        <% } %>
+                                    <% } else { %>
+                                    <span class="badge bg-light text-muted border">Pendiente</span>
+                                    <% } %>
                                 </td>
                             </tr>
                             <% }) %>
@@ -96,9 +112,17 @@
                                     <%= rec.motivo %>
                                 </div>
                                 <% } %>
+                                <% if (current_user && current_user.rol === 'profe') { %>
                                 <form method="POST" action="/recuperaciones/<%= rec.id %>/completar" class="mt-2 pt-2 border-top">
                                     <button type="submit" class="btn btn-sm btn-success w-100"><i class="bi bi-check-lg me-1"></i>Marcar Rendida</button>
                                 </form>
+                                <% } else if (current_user && current_user.rol === 'inspe' && Number(rec.porcentaje_exigencia) >= 70) { %>
+                                <div class="mt-2 pt-2 border-top">
+                                    <a href="/recuperaciones?tipo=pendientes_medico" class="btn btn-sm btn-outline-success w-100">
+                                        <i class="bi bi-file-earmark-medical me-1"></i>Acreditar Certificado en Inspectoría
+                                    </a>
+                                </div>
+                                <% } %>
                             </div>
                         </div>
                         <% }) %>

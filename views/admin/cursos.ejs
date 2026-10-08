@@ -32,7 +32,7 @@
             </div>
             <div class="card-body p-0">
                 <% if (data.length > 0) { %>
-                <div class="table-responsive">
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr><th>Nombre</th><th>Nivel</th><th class="text-end">Acciones</th></tr>
@@ -51,6 +51,25 @@
                             <% }) %>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Tarjetas para Móviles (< 768px) -->
+                <div class="d-md-none p-3">
+                    <div class="row g-2">
+                        <% data.forEach(c => { %>
+                        <div class="col-12">
+                            <div class="p-3 bg-white rounded border shadow-xs d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-dark"><%= c.nombre %></h6>
+                                    <span class="badge bg-light text-secondary border small"><%= c.nivel %></span>
+                                </div>
+                                <form method="POST" action="/admin/cursos/<%= c.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar el curso <%= c.nombre %>?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
+                        </div>
+                        <% }) %>
+                    </div>
                 </div>
                 <% } else { %>
                 <p class="text-center text-muted py-4">Aún no hay cursos registrados.</p>

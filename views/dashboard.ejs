@@ -2,7 +2,7 @@
 
 <div class="row g-3 mb-4">
     <!-- Stat 1: Evaluaciones hoy -->
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="stat-icon" style="background:#FBF5E6; color:var(--mustard);">
                 <i class="bi bi-calendar-check"></i>
@@ -14,7 +14,7 @@
         </div>
     </div>
     <!-- Stat 2: Esta semana -->
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="stat-icon" style="background:#EFF5F8; color:#2C5F7A;">
                 <i class="bi bi-calendar3"></i>
@@ -26,26 +26,26 @@
         </div>
     </div>
     <!-- Stat 3: Recuperaciones pendientes -->
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="stat-icon" style="background:#FBF0EE; color:#A5332A;">
                 <i class="bi bi-arrow-counterclockwise"></i>
             </div>
             <div>
                 <div class="stat-number"><%= recuperaciones_pendientes.length %></div>
-                <div class="stat-label">Recuperaciones Pendientes</div>
+                <div class="stat-label">Recup. Pendientes</div>
             </div>
         </div>
     </div>
     <!-- Stat 4: Total cursos -->
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="stat-icon" style="background:#EFF6F1; color:#2F6F4E;">
                 <i class="bi bi-mortarboard"></i>
             </div>
             <div>
                 <div class="stat-number"><%= total_cursos %></div>
-                <div class="stat-label">Cursos Registrados</div>
+                <div class="stat-label">Cursos Totales</div>
             </div>
         </div>
     </div>
@@ -63,11 +63,12 @@
                 </a>
                 <% } %>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0 p-md-3">
                 <% if (evals_hoy.length > 0) { %>
-                <div class="table-responsive">
+                <!-- Vista tabla para Desktop y Tablets -->
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover align-middle mb-0">
-                        <thead>
+                        <thead class="table-light">
                             <tr>
                                 <th>Hora</th>
                                 <th>Curso</th>
@@ -91,13 +92,44 @@
                                 <td><%= ev.profesor.nombre_completo %></td>
                                 <td class="text-end">
                                     <a href="/evaluaciones/<%= ev.id %>" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye"></i> Detalle
+                                        <i class="bi bi-eye me-1"></i>Detalle
                                     </a>
                                 </td>
                             </tr>
                             <% }) %>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Vista tarjetas para Teléfonos Móviles (< 768px) -->
+                <div class="d-md-none p-3">
+                    <div class="row g-2">
+                        <% evals_hoy.forEach(ev => { %>
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded border">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <span class="badge" style="background-color: <%= ev.asignatura.color %>;">
+                                        <%= ev.asignatura.nombre %>
+                                    </span>
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="bi bi-clock me-1"></i><%= ev.hora || 'Horario clase' %>
+                                    </span>
+                                </div>
+                                <h6 class="mb-1 fw-bold">
+                                    <a href="/evaluaciones/<%= ev.id %>" class="text-decoration-none text-dark">
+                                        <%= ev.titulo %>
+                                    </a>
+                                </h6>
+                                <div class="small text-muted mb-2">
+                                    <strong><%= ev.curso.nombre %></strong> &bull; Prof: <%= ev.profesor.nombre_completo %>
+                                </div>
+                                <a href="/evaluaciones/<%= ev.id %>" class="btn btn-sm btn-outline-primary w-100">
+                                    <i class="bi bi-eye me-1"></i>Ver Detalle y Asistencia
+                                </a>
+                            </div>
+                        </div>
+                        <% }) %>
+                    </div>
                 </div>
                 <% } else { %>
                 <div class="text-center text-muted py-4">

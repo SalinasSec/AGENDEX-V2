@@ -16,24 +16,24 @@
 <div class="card mb-4">
     <div class="card-body py-3">
         <form method="GET" action="/alumnos" class="row g-2 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label small">Buscar</label>
+            <div class="col-12 col-sm-6 col-md-5">
+                <label class="form-label small mb-1 fw-semibold">Buscar</label>
                 <input type="text" name="busqueda" class="form-control form-control-sm" placeholder="Nombre, apellido o RUT..." value="<%= filtros.busqueda || '' %>">
             </div>
-            <div class="col-md-3">
-                <label class="form-label small">Curso</label>
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label small mb-1 fw-semibold">Curso</label>
                 <select name="curso_id" class="form-select form-select-sm">
-                    <option value="">Todos</option>
+                    <option value="">Todos los cursos</option>
                     <% cursos.forEach(c => { %>
                     <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
                     <% }) %>
                 </select>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-search"></i> Buscar</button>
+            <div class="col-6 col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-search me-1"></i>Buscar</button>
             </div>
-            <div class="col-md-2">
-                <a href="/alumnos" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-x-lg"></i> Limpiar</a>
+            <div class="col-6 col-md-2">
+                <a href="/alumnos" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-x-lg me-1"></i>Limpiar</a>
             </div>
         </form>
     </div>
@@ -42,21 +42,22 @@
 <div class="card">
     <div class="card-body p-0">
         <% if (alumnos.length > 0) { %>
-        <div class="table-responsive">
+        <!-- Tabla para PC y Tablets anchas -->
+        <div class="table-responsive d-none d-md-block">
             <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th>RUT</th>
-                        <th>Nombre</th>
-                        <th>Apellido</th>
-                        <th>Curso</th>
-                        <th class="text-end">Acciones</th>
+                        <th class="nowrap" style="min-width: 120px;">RUT</th>
+                        <th style="min-width: 160px;">Nombre</th>
+                        <th style="min-width: 160px;">Apellido</th>
+                        <th class="nowrap" style="min-width: 130px;">Curso</th>
+                        <th class="text-end nowrap" style="min-width: 110px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% alumnos.forEach(a => { %>
                     <tr>
-                        <td class="text-muted"><%= a.rut %></td>
+                        <td class="text-muted font-monospace"><%= a.rut %></td>
                         <td>
                             <a href="/alumnos/<%= a.id %>" class="text-decoration-none fw-semibold">
                                 <%= a.nombre %>
@@ -66,13 +67,39 @@
                         <td><span class="badge bg-secondary"><%= a.curso ? a.curso.nombre : 'Sin curso' %></span></td>
                         <td class="text-end">
                             <a href="/alumnos/<%= a.id %>" class="btn btn-outline-primary btn-sm" title="Ver Perfil">
-                                <i class="bi bi-eye"></i> Perfil
+                                <i class="bi bi-eye me-1"></i>Perfil
                             </a>
                         </td>
                     </tr>
                     <% }) %>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Tarjetas responsivas para Móviles (< 768px) -->
+        <div class="d-md-none p-3">
+            <div class="row g-2">
+                <% alumnos.forEach(a => { %>
+                <div class="col-12">
+                    <div class="p-3 bg-white rounded border shadow-xs d-flex justify-content-between align-items-center gap-2">
+                        <div class="min-w-0">
+                            <div class="fw-bold text-dark text-truncate">
+                                <%= a.nombre %> <%= a.apellido %>
+                            </div>
+                            <div class="small text-muted font-monospace mb-1">
+                                <i class="bi bi-person-vcard me-1"></i><%= a.rut %>
+                            </div>
+                            <span class="badge bg-secondary-subtle text-secondary border">
+                                <i class="bi bi-mortarboard me-1"></i><%= a.curso ? a.curso.nombre : 'Sin curso' %>
+                            </span>
+                        </div>
+                        <a href="/alumnos/<%= a.id %>" class="btn btn-sm btn-outline-primary flex-shrink-0">
+                            <i class="bi bi-eye me-1"></i>Perfil
+                        </a>
+                    </div>
+                </div>
+                <% }) %>
+            </div>
         </div>
         <% } else { %>
         <div class="text-center py-5 text-muted">

@@ -945,7 +945,7 @@ app.get('/alumnos/:id', requireAuth, (req, res) => {
 // RECUPERACIONES
 // -------------------------------------------------------------
 app.get('/recuperaciones', requireAuth, (req, res) => {
-  const { estado } = req.query;
+  const { estado, tipo } = req.query;
   let list = [...store.recuperaciones];
 
   // Si el usuario es profesor, solo ve las recuperaciones de las asignaturas y cursos que le corresponden
@@ -958,11 +958,21 @@ app.get('/recuperaciones', requireAuth, (req, res) => {
     list = list.filter(r => r.alumno_id === req.session.user.alumno_id);
   }
 
+  // Filtro por estado operativo de la prueba (usado principalmente por profesores y UTP)
   if (estado) {
     list = list.filter(r => r.estado === estado);
   }
 
-  // Enrich with full objects
+  // Filtro por tipo de acreditación médica (usado principalmente por Inspectoría General)
+  if (tipo === 'pendientes_medico') {
+    list = list.filter(r => Number(r.porcentaje_exigencia) >= 70);
+  } else if (tipo === 'acreditadas') {
+    list = list.filter(r => Number(r.porcentaje_exigencia) < 70 && r.tipo_justificacion !== 'salida_pedagogica');
+  } else if (tipo === 'salida') {
+    list = list.filter(r => r.tipo_justificacion === 'salida_pedagogica');
+  }
+
+  // Enriquecer con objetos completos
   list = list.map(r => ({
     ...r,
     alumno: store.getAlumnoById(r.alumno_id),
@@ -973,17 +983,21 @@ app.get('/recuperaciones', requireAuth, (req, res) => {
     title: 'Recuperaciones',
     active: 'recuperaciones',
     recuperaciones: list,
-    filtros: { estado }
+    filtros: { estado, tipo }
   });
 });
 
 app.get('/recuperaciones/crear', requireAuth, (req, res) => {
   if (req.session.user.rol === 'utp') {
-    req.flash('warning', 'La asignación de recuperaciones corresponde a los Profesores e Inspectoría General. El perfil UTP cumple labores de supervisión y reportería.');
+    req.flash('warning', 'La asignación de recuperaciones corresponde a los Profesores. El perfil UTP cumple labores de supervisión y reportería.');
     return res.redirect('/recuperaciones');
   }
-  if (!['inspe', 'profe'].includes(req.session.user.rol)) {
-    req.flash('danger', 'No tienes permisos para agendar recuperaciones.');
+  if (req.session.user.rol === 'inspe') {
+    req.flash('warning', 'La programación de fechas y contenidos de recuperaciones corresponde al Profesor de la asignatura. La tarea de Inspectoría es acreditar certificados médicos.');
+    return res.redirect('/recuperaciones');
+  }
+  if (req.session.user.rol !== 'profe') {
+    req.flash('danger', 'Solo los profesores de asignatura tienen permisos para agendar recuperaciones.');
     return res.redirect('/recuperaciones');
   }
 
@@ -999,7 +1013,7 @@ app.get('/recuperaciones/crear', requireAuth, (req, res) => {
   const enrichedAlumnos = store.alumnos.map(a => store.getAlumno(a.id));
 
   res.render('recuperaciones/crear', {
-    title: 'Nueva Recuperación',
+    title: 'Programar Recuperación',
     active: 'recuperaciones',
     evaluaciones: enrichedEvals,
     alumnos: enrichedAlumnos,
@@ -1009,63 +1023,67 @@ app.get('/recuperaciones/crear', requireAuth, (req, res) => {
   });
 });
 
-app.post('/recuperaciones/crear', requireAuth, requireRole('inspe', 'profe'), (req, res) => {
-  const { evaluacion_id, alumno_id, fecha_recuperacion, tipo_justificacion, motivo } = req.body;
+app.post('/recuperaciones/crear', requireAuth, requireRole('profe'), (req, res) => {
+  const { evaluacion_id, alumno_id, fecha_recuperacion, hora_recuperacion, indicaciones } = req.body;
   const aId = Number(alumno_id);
   const eId = Number(evaluacion_id);
 
-  // Determinar exigencia según normativa institucional:
-  // - Certificado médico: 60% (misma exigencia regular)
-  // - Salida pedagógica oficial: 60% (misma exigencia regular)
-  // - Fuerza mayor autorizada: 60%
-  // - Injustificada: 70% (escala diferenciada por inasistencia sin documento)
-  let porcentaje = 60.0;
-  let justificado = true;
-  let tipoEtiqueta = 'Certificado Médico';
-
-  if (tipo_justificacion === 'salida_pedagogica') {
-    porcentaje = 60.0;
-    justificado = true;
-    tipoEtiqueta = 'Salida Pedagógica';
-  } else if (tipo_justificacion === 'fuerza_mayor') {
-    porcentaje = 60.0;
-    justificado = true;
-    tipoEtiqueta = 'Fuerza Mayor';
-  } else if (tipo_justificacion === 'injustificada') {
-    porcentaje = 70.0;
-    justificado = false;
-    tipoEtiqueta = 'Injustificada';
-  } else {
-    porcentaje = 60.0;
-    justificado = true;
-    tipoEtiqueta = 'Certificado Médico';
+  if (!evaluacion_id || !alumno_id || !fecha_recuperacion) {
+    req.flash('danger', 'Debes seleccionar la evaluación original, el alumno ausente y la fecha de citación.');
+    return res.redirect('/recuperaciones/crear');
   }
 
-  const motivoCompleto = motivo ? `[${tipoEtiqueta}] ${motivo}` : `[${tipoEtiqueta}]`;
+  // Regla Institucional Liceo:
+  // El profesor simplemente genera la prueba recuperativa para el estudiante ausente.
+  // Por defecto, se crea con exigencia 70% (inasistencia pendiente de acreditar).
+  // Si el estudiante presenta certificado médico ante Inspectoría General, Inspectoría
+  // lo acreditará en el sistema y se rebajará automáticamente al 60% regular.
+  const asistPrevia = store.getAsistencia(aId, eId);
+  let porcentaje = 70.0;
+  let justificado = false;
+  let tipo_justificacion = 'injustificada';
+  let motivo = indicaciones ? `[Citación Recuperativa - 70% Exigencia inicial] ${indicaciones}` : 'Inasistencia pendiente de justificar ante Inspectoría (70% exigencia inicial)';
 
-  // Sincronizar registro de inasistencia en la evaluación
-  store.guardarAsistencia({
-    alumno_id: aId,
-    evaluacion_id: eId,
-    presente: false,
-    motivo: motivoCompleto,
-    justificado
-  });
+  // Si Inspectoría General ya había acreditado un certificado médico o salida pedagógica para esta inasistencia:
+  if (asistPrevia && (asistPrevia.justificado || asistPrevia.estado_asistencia === 'justificado' || asistPrevia.estado_asistencia === 'salida')) {
+    porcentaje = 60.0;
+    justificado = true;
+    tipo_justificacion = asistPrevia.estado_asistencia === 'salida' ? 'salida_pedagogica' : 'medico';
+    motivo = asistPrevia.motivo || '[Certificado Médico Acreditado en Inspectoría]';
+    if (indicaciones) motivo += ` • Indicaciones del docente: ${indicaciones}`;
+  } else {
+    // Registrar o actualizar inasistencia de la evaluación
+    store.guardarAsistencia({
+      alumno_id: aId,
+      evaluacion_id: eId,
+      presente: false,
+      motivo,
+      justificado: false,
+      estado_asistencia: 'injustificada'
+    });
+  }
 
   store.crearRecuperacion({
     evaluacion_id: eId,
     alumno_id: aId,
     fecha_recuperacion,
+    hora_recuperacion: hora_recuperacion || '',
     porcentaje_exigencia: porcentaje,
-    tipo_justificacion: tipo_justificacion || 'medico',
-    motivo: motivoCompleto
+    tipo_justificacion,
+    motivo
   });
 
-  req.flash('success', `Recuperación programada al ${porcentaje}% de exigencia (${tipoEtiqueta}).`);
+  const al = store.getAlumnoById(aId);
+  const nombreAl = al ? al.nombre_completo : 'el estudiante';
+  if (porcentaje === 60.0) {
+    req.flash('success', `Evaluación recuperativa programada para ${nombreAl} al 60% de exigencia (certificado médico ya acreditado en Inspectoría).`);
+  } else {
+    req.flash('success', `Evaluación recuperativa programada para ${nombreAl} al 70% de exigencia inicial. Se rebajará automáticamente al 60% cuando Inspectoría General acredite el certificado médico.`);
+  }
   res.redirect('/recuperaciones');
 });
 
-app.post('/recuperaciones/:id/completar', requireAuth, requireRole('profe', 'inspe'), (req, res) => {
+app.post('/recuperaciones/:id/completar', requireAuth, requireRole('profe'), (req, res) => {
   const id = Number(req.params.id);
   const r = store.actualizarEstadoRecuperacion(id, 'completada');
   const al = r && r.alumno ? r.alumno.nombre_completo : 'El estudiante';
@@ -1074,7 +1092,7 @@ app.post('/recuperaciones/:id/completar', requireAuth, requireRole('profe', 'ins
 });
 
 // Registrar inasistencia definitiva a la prueba recuperativa (Aplica nota 1.1)
-app.post('/recuperaciones/:id/no-presento', requireAuth, requireRole('profe', 'inspe'), (req, res) => {
+app.post('/recuperaciones/:id/no-presento', requireAuth, requireRole('profe'), (req, res) => {
   const id = Number(req.params.id);
   const r = store.actualizarEstadoRecuperacion(id, 'no_presento');
   if (r) {
@@ -1116,7 +1134,7 @@ app.post('/recuperaciones/:id/justificar-medico', requireAuth, requireRole('insp
   res.redirect(req.get('Referrer') || '/recuperaciones');
 });
 
-app.post('/recuperaciones/:id/cancelar', requireAuth, requireRole('utp', 'profe', 'inspe'), (req, res) => {
+app.post('/recuperaciones/:id/cancelar', requireAuth, requireRole('profe'), (req, res) => {
   const id = Number(req.params.id);
   store.actualizarEstadoRecuperacion(id, 'cancelada');
   req.flash('info', 'Recuperación cancelada.');

@@ -1,30 +1,34 @@
 <%- include('../partials/header', { 
-    title: 'Nueva Recuperación', 
+    title: 'Programar Recuperación', 
     active: 'recuperaciones',
-    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item"><a href="/recuperaciones">Recuperaciones</a></li><li class="breadcrumb-item active">Nueva Recuperación</li></ol></nav>'
+    breadcrumb: '<nav aria-label="breadcrumb"><ol class="breadcrumb mb-0"><li class="breadcrumb-item"><a href="/">Inicio</a></li><li class="breadcrumb-item"><a href="/recuperaciones">Recuperaciones</a></li><li class="breadcrumb-item active">Programar Recuperación</li></ol></nav>'
 }) %>
 
 <div class="row justify-content-center">
     <div class="col-12 col-md-10 col-lg-8">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white border-bottom py-3">
-                <div class="d-flex align-items-center">
-                    <span class="badge bg-warning text-dark me-2 fs-6"><i class="bi bi-shield-check"></i> Inspectoría</span>
-                    <h5 class="card-title mb-0 fw-bold">Registrar Justificativo y Programar Recuperación</h5>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-primary text-white me-2 fs-6"><i class="bi bi-person-video3"></i> Rol Docente</span>
+                        <h5 class="card-title mb-0 fw-bold">Programar Evaluación Recuperativa</h5>
+                    </div>
+                    <span class="badge bg-light text-muted border">Exclusivo Profesores</span>
                 </div>
             </div>
             <div class="card-body p-4">
-                <!-- Marco normativo y reglas de exigencia -->
-                <div class="alert alert-light border border-info-subtle mb-4">
-                    <div class="d-flex align-items-start gap-2">
-                        <i class="bi bi-info-circle-fill text-primary fs-5 mt-1"></i>
+                <!-- Marco normativo y división de roles -->
+                <div class="alert alert-light border border-primary-subtle mb-4">
+                    <div class="d-flex align-items-start gap-3">
+                        <i class="bi bi-info-circle-fill text-primary fs-4 mt-1"></i>
                         <div>
-                            <strong class="d-block text-dark mb-1">Criterio Reglamentario de Exigencia:</strong>
+                            <strong class="d-block text-dark mb-1">Criterio Reglamentario del Liceo:</strong>
+                            <p class="small text-muted mb-2">
+                                Como docente, tu labor es únicamente <strong>agendar la citación y los contenidos a evaluar</strong> para el estudiante que estuvo ausente.
+                            </p>
                             <ul class="small text-muted mb-0 ps-3">
-                                <li><strong>Certificado Médico:</strong> Inasistencia médica recepcionada en Inspectoría &rarr; <span class="badge bg-success">60% de exigencia (Misma regular)</span></li>
-                                <li><strong>Salida Pedagógica:</strong> Alumnos en comisiones, torneos o salidas escolares autorizadas &rarr; <span class="badge bg-info text-dark">60% de exigencia (Misma regular)</span></li>
-                                <li><strong>Fuerza Mayor:</strong> Justificado formalmente en Inspectoría &rarr; <span class="badge bg-success">60% de exigencia</span></li>
-                                <li><strong>Inasistencia Injustificada:</strong> No se presentó documento en plazo &rarr; <span class="badge bg-danger">70% de exigencia</span></li>
+                                <li class="mb-1"><strong>Exigencia Inicial (70%):</strong> La evaluación recuperativa se genera automáticamente con <span class="badge bg-danger">70% de exigencia</span> (inasistencia sin justificar).</li>
+                                <li><strong>Acreditación en Inspectoría:</strong> Si el estudiante o apoderado presenta certificado médico ante <strong>Inspectoría General</strong>, Inspectoría validará el documento y el sistema rebajará automáticamente la exigencia al <span class="badge bg-success">60% regular</span>.</li>
                             </ul>
                         </div>
                     </div>
@@ -36,7 +40,7 @@
                         <div class="col-12">
                             <label class="form-label fw-semibold">1. Evaluación Original <span class="text-danger">*</span></label>
                             <select name="evaluacion_id" id="evalSelect" class="form-select" required>
-                                <option value="">-- Seleccionar evaluación original --</option>
+                                <option value="">-- Seleccionar evaluación original del curso --</option>
                                 <% evaluaciones.forEach(ev => { %>
                                     <% const cursoNombre = ev.curso ? ev.curso.nombre : (ev.curso_id ? 'Curso #' + ev.curso_id : 'Sin Curso'); %>
                                     <% const asigNombre = ev.asignatura ? ev.asignatura.nombre : 'Asignatura'; %>
@@ -51,9 +55,9 @@
 
                         <!-- Selección de Alumno -->
                         <div class="col-12">
-                            <label class="form-label fw-semibold">2. Alumno que rinde recuperación <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">2. Estudiante Ausente a Evaluar <span class="text-danger">*</span></label>
                             <select name="alumno_id" id="alumnoSelect" class="form-select" required>
-                                <option value="">-- Seleccionar alumno ausente --</option>
+                                <option value="">-- Seleccionar estudiante ausente --</option>
                                 <% alumnos.forEach(a => { %>
                                     <% const cursoAlumno = a.curso ? a.curso.nombre : ''; %>
                                     <option value="<%= a.id %>" 
@@ -63,46 +67,44 @@
                                     </option>
                                 <% }) %>
                             </select>
-                            <div class="form-text" id="filtroTextoAyuda">Al seleccionar una evaluación, se destacarán los alumnos de ese curso.</div>
-                        </div>
-
-                        <!-- Tipo de Justificación / Motivo -->
-                        <div class="col-12 col-md-7">
-                            <label class="form-label fw-semibold">3. Tipo de Justificación ante Inspectoría <span class="text-danger">*</span></label>
-                            <select name="tipo_justificacion" id="tipoJustificacion" class="form-select" required>
-                                <option value="medico" selected>🏥 Certificado Médico (Exigencia normal: 60%)</option>
-                                <option value="salida_pedagogica">🚌 Salida Pedagógica / Actividad Oficial (Exigencia normal: 60%)</option>
-                                <option value="fuerza_mayor">📋 Caso Fortuito o Causa Mayor Acreditada (Exigencia normal: 60%)</option>
-                                <option value="injustificada">⚠️ Inasistencia Injustificada (Exigencia aumentada: 70%)</option>
-                            </select>
+                            <div class="form-text" id="filtroTextoAyuda">Al seleccionar una evaluación, se destacarán los estudiantes de ese curso en color azul.</div>
                         </div>
 
                         <!-- Fecha de Recuperación -->
-                        <div class="col-12 col-md-5">
-                            <label class="form-label fw-semibold">4. Fecha de Recuperación <span class="text-danger">*</span></label>
+                        <div class="col-12 col-md-7">
+                            <label class="form-label fw-semibold">3. Fecha de Rendición de la Recuperativa <span class="text-danger">*</span></label>
                             <input type="date" name="fecha_recuperacion" class="form-control" required min="<%= hoy %>" value="<%= hoy %>">
+                            <div class="form-text">Día en que el estudiante deberá presentarse a rendir la prueba.</div>
                         </div>
 
-                        <!-- Visualizador de Exigencia Dinámica -->
+                        <!-- Hora / Bloque opcional -->
+                        <div class="col-12 col-md-5">
+                            <label class="form-label fw-semibold">4. Hora / Bloque o Sala <span class="text-muted small">(Opcional)</span></label>
+                            <input type="text" name="hora_recuperacion" class="form-control" placeholder="Ej: 14:15 hrs o Bloque 3">
+                        </div>
+
+                        <!-- Indicaciones pedagógicas o temario -->
                         <div class="col-12">
-                            <div id="cajaExigencia" class="p-3 rounded border bg-success-subtle border-success text-success-emphasis d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i id="iconoExigencia" class="bi bi-check-circle-fill fs-4 text-success"></i>
+                            <label class="form-label fw-semibold">5. Indicaciones o Temario para el Estudiante <span class="text-muted small">(Opcional)</span></label>
+                            <input type="text" name="indicaciones" id="indicacionesInput" class="form-control" 
+                                   placeholder="Ej: Traer calculadora y regla; temario: Unidad 2 Leyes de Newton.">
+                            <div class="form-text">Instrucciones o materiales que el estudiante verá en su citación.</div>
+                        </div>
+
+                        <!-- Cuadro informativo de exigencia automática -->
+                        <div class="col-12">
+                            <div class="p-3 rounded border bg-danger-subtle border-danger text-danger-emphasis d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-3">
+                                    <i class="bi bi-shield-exclamation fs-3 text-danger"></i>
                                     <div>
-                                        <div class="fw-bold" id="tituloExigencia">Exigencia Aplicada: 60% (Sin Penalización)</div>
-                                        <div class="small text-muted" id="descExigencia">Inasistencia justificada debidamente por Inspectoría. El alumno rinde en igualdad de condiciones.</div>
+                                        <div class="fw-bold">Exigencia Asignada Inicialmente: 70%</div>
+                                        <div class="small text-muted">
+                                            La citación se registra con 70%. Cuando el estudiante acredite su certificado médico en <strong>Inspectoría General</strong>, la exigencia pasará de inmediato al 60%.
+                                        </div>
                                     </div>
                                 </div>
-                                <span class="badge bg-success fs-5 px-3 py-2" id="badgeExigencia">60%</span>
+                                <span class="badge bg-danger fs-5 px-3 py-2">70%</span>
                             </div>
-                        </div>
-
-                        <!-- Observaciones o Detalle del Documento -->
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">5. Detalle / Folio de Justificativo en Inspectoría</label>
-                            <input type="text" name="motivo" id="motivoInput" class="form-control" 
-                                   placeholder="Ej: Certificado médico Dr. Soto N° 44102, o: Delegación Salida Pedagógica Robótica">
-                            <div class="form-text">Especifica los datos del certificado médico presentado o el nombre de la salida escolar.</div>
                         </div>
                     </div>
 
@@ -112,8 +114,8 @@
                         <a href="/recuperaciones" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left me-1"></i> Volver a Recuperaciones
                         </a>
-                        <button type="submit" class="btn btn-warning px-4 fw-bold">
-                            <i class="bi bi-check-circle-fill me-1"></i> Confirmar y Asignar Recuperación
+                        <button type="submit" class="btn btn-warning px-4 fw-bold shadow-sm">
+                            <i class="bi bi-calendar-plus me-1"></i> Programar Evaluación Recuperativa
                         </button>
                     </div>
                 </form>
@@ -126,46 +128,11 @@
     scripts: `
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const tipoSelect = document.getElementById('tipoJustificacion');
-    const caja = document.getElementById('cajaExigencia');
-    const icono = document.getElementById('iconoExigencia');
-    const titulo = document.getElementById('tituloExigencia');
-    const desc = document.getElementById('descExigencia');
-    const badge = document.getElementById('badgeExigencia');
     const evalSelect = document.getElementById('evalSelect');
     const alumnoSelect = document.getElementById('alumnoSelect');
 
-    function actualizarExigencia() {
-        const val = tipoSelect.value;
-        if (val === 'injustificada') {
-            caja.className = 'p-3 rounded border bg-danger-subtle border-danger text-danger-emphasis d-flex align-items-center justify-content-between';
-            icono.className = 'bi bi-exclamation-octagon-fill fs-4 text-danger';
-            titulo.textContent = 'Exigencia Aplicada: 70% (Escala Diferenciada)';
-            desc.textContent = 'Inasistencia sin documento probatorio. Se aplica el 70% de exigencia según reglamento.';
-            badge.className = 'badge bg-danger fs-5 px-3 py-2';
-            badge.textContent = '70%';
-        } else if (val === 'salida_pedagogica') {
-            caja.className = 'p-3 rounded border bg-info-subtle border-info text-info-emphasis d-flex align-items-center justify-content-between';
-            icono.className = 'bi bi-bus-front-fill fs-4 text-info';
-            titulo.textContent = 'Exigencia Aplicada: 60% (Salida Pedagógica Oficial)';
-            desc.textContent = 'Inasistencia justificada por salida institucional. Se mantiene la misma exigencia que el resto del curso (60%).';
-            badge.className = 'badge bg-info text-dark fs-5 px-3 py-2';
-            badge.textContent = '60%';
-        } else {
-            caja.className = 'p-3 rounded border bg-success-subtle border-success text-success-emphasis d-flex align-items-center justify-content-between';
-            icono.className = 'bi bi-check-circle-fill fs-4 text-success';
-            titulo.textContent = 'Exigencia Aplicada: 60% (Certificado Médico Válido)';
-            desc.textContent = 'Inasistencia de salud acreditada ante Inspectoría. Se mantiene la misma exigencia regular (60%).';
-            badge.className = 'badge bg-success fs-5 px-3 py-2';
-            badge.textContent = '60%';
-        }
-    }
-
-    tipoSelect.addEventListener('change', actualizarExigencia);
-    actualizarExigencia();
-
-    // Filtrar u ordenar alumnos según curso de la evaluación seleccionada
-    evalSelect.addEventListener('change', () => {
+    // Filtrar y destacar alumnos según curso de la evaluación seleccionada
+    function sincronizarAlumnosPorCurso() {
         const selectedOption = evalSelect.options[evalSelect.selectedIndex];
         const cursoId = selectedOption ? selectedOption.getAttribute('data-curso-id') : null;
         if (!cursoId) return;
@@ -185,7 +152,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 opt.style.color = '';
             }
         }
-    });
+    }
+
+    evalSelect.addEventListener('change', sincronizarAlumnosPorCurso);
+    sincronizarAlumnosPorCurso();
 });
 </script>
 `

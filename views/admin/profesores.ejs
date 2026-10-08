@@ -36,7 +36,8 @@
             </div>
             <div class="card-body p-0">
                 <% if (data.length > 0) { %>
-                <div class="table-responsive">
+                <!-- Vista tabla para Desktop y Tablets -->
+                <div class="table-responsive d-none d-md-block">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
@@ -92,6 +93,52 @@
                             <% }) %>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Vista tarjetas para Teléfonos Móviles (< 768px) -->
+                <div class="d-md-none p-3">
+                    <div class="row g-2">
+                        <% data.forEach(p => { %>
+                        <div class="col-12">
+                            <div class="p-3 bg-white rounded border shadow-xs">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <div>
+                                        <h6 class="fw-bold mb-0 text-dark"><%= p.nombre %> <%= p.apellido %></h6>
+                                        <div class="small text-muted"><%= p.email || 'Sin correo' %></div>
+                                    </div>
+                                    <span class="badge bg-light text-dark border"><%= p.materia || 'General' %></span>
+                                </div>
+                                <% if (p.cargo_extra) { %>
+                                <div class="mb-2">
+                                    <span class="badge <%= p.es_jefatura ? 'bg-primary text-white' : 'bg-light text-secondary border' %>">
+                                        <%= p.cargo_extra %>
+                                    </span>
+                                </div>
+                                <% } %>
+                                <div class="small mb-3">
+                                    <span class="text-muted">Cursos:</span>
+                                    <% if (p.cursos_asignados && p.cursos_asignados.length > 0) { %>
+                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                            <% p.cursos_asignados.forEach(cId => { 
+                                                const cur = cursos.find(c => c.id === cId);
+                                                if (cur) {
+                                            %>
+                                                <span class="badge bg-secondary-subtle text-secondary border"><%= cur.nombre %></span>
+                                            <%  } }) %>
+                                        </div>
+                                    <% } else { %>
+                                        <span class="text-muted">Todos los cursos</span>
+                                    <% } %>
+                                </div>
+                                <div class="pt-2 border-top text-end">
+                                    <form method="POST" action="/admin/profesores/<%= p.id %>/eliminar" class="d-inline" onsubmit="return confirm('¿Eliminar al profesor <%= p.nombre %> <%= p.apellido %>?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Eliminar Profesor</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <% }) %>
+                    </div>
                 </div>
                 <% } else { %>
                 <p class="text-center text-muted py-4">Aún no hay profesores registrados.</p>

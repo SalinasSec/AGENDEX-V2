@@ -119,7 +119,7 @@
                     <% } else { %>
                     <form method="POST" action="/evaluaciones/<%= ev.id %>/asistencia">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0" style="min-width: 620px;">
+                            <table class="table table-hover align-middle mb-0 table-stack-mobile">
                                 <thead class="table-light">
                                     <tr>
                                         <th style="min-width: 170px;">Alumno Ausente</th>
@@ -200,7 +200,7 @@
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" style="min-width: 580px;">
+                        <table class="table table-hover align-middle mb-0 table-stack-mobile">
                             <thead class="table-light">
                                 <tr>
                                     <th style="width: 50px;">#</th>
@@ -249,7 +249,7 @@
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" style="min-width: 620px;">
+                        <table class="table table-hover align-middle mb-0 table-stack-mobile">
                             <thead class="table-light">
                                 <tr>
                                     <th style="min-width: 170px;">Alumno</th>
@@ -298,10 +298,16 @@
                                         <% } else { %>
                                         <span class="badge bg-success" title="60% regular">60%</span>
                                         <% } %>
-                                        <% if (estadoActual !== 'presente' && ['profe', 'inspe'].includes(current_user.rol)) { %>
+                                        <% if (estadoActual !== 'presente' && current_user.rol === 'profe') { %>
                                         <div class="mt-1">
                                             <a href="/recuperaciones/crear?evaluacion_id=<%= ev.id %>&alumno_id=<%= alumno.id %>" class="btn btn-outline-warning btn-sm py-0 px-2" style="font-size: 0.72rem;">
-                                                <i class="bi bi-calendar-plus me-1"></i>Recuperar
+                                                <i class="bi bi-calendar-plus me-1"></i>Programar Recup. (70%)
+                                            </a>
+                                        </div>
+                                        <% } else if (estadoActual === 'injustificada' && current_user.rol === 'inspe') { %>
+                                        <div class="mt-1">
+                                            <a href="/recuperaciones?tipo=pendientes_medico" class="btn btn-outline-success btn-sm py-0 px-2" style="font-size: 0.72rem;">
+                                                <i class="bi bi-file-earmark-medical me-1"></i>Acreditar Médico
                                             </a>
                                         </div>
                                         <% } %>
@@ -321,7 +327,7 @@
 
                     <form method="POST" action="/evaluaciones/<%= ev.id %>/asistencia">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0" style="min-width: 620px;">
+                            <table class="table table-hover align-middle mb-0 table-stack-mobile">
                                 <thead class="table-light">
                                     <tr>
                                         <th style="min-width: 170px;">Alumno</th>
@@ -399,7 +405,7 @@
                 <% } else { %>
                     <!-- Vista de solo lectura (UTP, Alumnos, Apoderados) -->
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
+                        <table class="table table-sm align-middle mb-0 table-stack-mobile">
                             <thead class="table-light">
                                 <tr>
                                     <th>Alumno</th>
