@@ -147,7 +147,7 @@
                             <tr>
                                 <td>
                                     <span>{{ ev.fecha }}</span>
-                                    {% if ev.fecha == today %}<span class="badge bg-success ms-1">Hoy</span>{% endif %}
+                                    {% if (ev.fecha|string) == (today|string) %}<span class="badge bg-success ms-1">Hoy</span>{% endif %}
                                 </td>
                                 <td><strong>{{ ev.titulo }}</strong></td>
                                 <td><span class="badge" style="background:{{ ev.asignatura.color }};">{{ ev.asignatura.nombre }}</span></td>

@@ -167,7 +167,7 @@
 
                 {% elif current_user.rol == 'profe' %}
                     <!-- Profesor -->
-                    {% if ev.fecha > hoy %}
+                    {% if (ev.fecha|string) > (hoy|string) %}
                     <!-- Caso 1: La evaluación es para una fecha futura -->
                     <div class="alert alert-primary bg-primary bg-opacity-10 border-primary border-opacity-25 py-3 mb-3">
                         <div class="d-flex align-items-center gap-2 mb-2">
@@ -213,7 +213,7 @@
                         <a href="/evaluaciones" class="btn btn-outline-secondary btn-sm">
                             <i class="bi bi-arrow-left me-1"></i>Volver a Evaluaciones
                         </a>
-                        {% if current_user.profesor_id == ev.profesor_id %}
+                        {% if current_user.profesor_id and (current_user.profesor_id|string == ev.profesor_id|string) %}
                         <a href="/evaluaciones/{{ ev.id }}/editar" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-pencil me-1"></i>Editar Evaluación
                         </a>

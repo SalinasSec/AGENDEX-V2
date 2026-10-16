@@ -48,6 +48,27 @@ def role_required(*roles):
         return decorated_function
     return decorator
 
+def format_date_val(val):
+    if val is None:
+        return ''
+    if hasattr(val, 'strftime'):
+        return val.strftime('%Y-%m-%d')
+    return str(val)
+
+def format_time_val(val):
+    if val is None:
+        return ''
+    if hasattr(val, 'strftime'):
+        return val.strftime('%H:%M')
+    s = str(val)
+    if len(s) >= 5 and ':' in s:
+        return s[:5]
+    return s
+
+@app.template_filter('str_date')
+def str_date_filter(val):
+    return format_date_val(val)
+
 @app.context_processor
 def inject_context():
     user = session.get('user')
@@ -75,7 +96,8 @@ def inject_context():
         hoy=t.strftime('%Y-%m-%d'),
         today=t.strftime('%Y-%m-%d'),
         today_formatted=hoy_fmt,
-        alumno_recups_count=alumno_recups_count
+        alumno_recups_count=alumno_recups_count,
+        format_date=format_date_val
     )
 
 def check_and_update_database_schema(conn):
@@ -231,6 +253,8 @@ def index():
             evals = cursor.fetchall()
 
             for ev in evals:
+                ev['fecha'] = format_date_val(ev.get('fecha'))
+                ev['hora'] = format_time_val(ev.get('hora'))
                 ev['asignatura'] = {'nombre': ev.get('asignatura_nombre') or 'General', 'color': ev.get('asignatura_color') or '#14213D'}
                 ev['profesor'] = {'nombre_completo': f"{ev.get('profe_nombre') or ''} {ev.get('profe_apellido') or ''}".strip() or 'Docente'}
                 ev['curso'] = {'nombre': ev.get('curso_nombre') or 'Curso'}
@@ -250,7 +274,9 @@ def index():
             recuperaciones = cursor.fetchall()
 
             for r in recuperaciones:
-                f_rec = str(r['fecha_recuperacion'])
+                f_rec = format_date_val(r.get('fecha_recuperacion'))
+                r['fecha_recuperacion'] = f_rec
+                r['eval_fecha'] = format_date_val(r.get('eval_fecha'))
                 if f_rec == hoy:
                     r['aviso_tiempo'] = '¡Rinde Hoy!'
                     r['aviso_clase'] = 'danger'
@@ -270,7 +296,7 @@ def index():
                     r['aviso_tiempo'] = 'Fecha cumplida'
                     r['aviso_clase'] = 'secondary'
 
-                r['porcentaje_exigencia'] = float(r.get('exigencia') or 60)
+                r['porcentaje_exigencia'] = float(r.get('exigencia') or 70.00)
                 prof_nom = f"{r.get('profe_nombre') or ''} {r.get('profe_apellido') or ''}".strip()
                 r['profesor_nombre'] = prof_nom or 'Profesor de la Asignatura'
                 r['asignatura'] = {'nombre': r.get('asignatura_nombre') or 'General', 'color': r.get('asignatura_color') or '#14213D'}
@@ -291,6 +317,7 @@ def index():
             """, (alumno_id,))
             inasistencias = cursor.fetchall()
             for inas in inasistencias:
+                inas['eval_fecha'] = format_date_val(inas.get('eval_fecha'))
                 inas['asignatura'] = {'nombre': inas.get('asignatura_nombre') or 'General', 'color': inas.get('asignatura_color') or '#14213D'}
                 inas['profesor_nombre'] = f"{inas.get('profe_nombre') or ''} {inas.get('profe_apellido') or ''}".strip() or 'Docente'
 
@@ -326,6 +353,8 @@ def index():
         todas_evals = cursor.fetchall()
 
         for ev in todas_evals:
+            ev['fecha'] = format_date_val(ev.get('fecha'))
+            ev['hora'] = format_time_val(ev.get('hora'))
             ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
             ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
             ev['curso'] = {'nombre': ev['curso_nombre']}
@@ -346,6 +375,8 @@ def index():
         """)
         recuperaciones_pendientes = cursor.fetchall()
         for r in recuperaciones_pendientes:
+            r['fecha_recuperacion'] = format_date_val(r.get('fecha_recuperacion'))
+            r['porcentaje_exigencia'] = float(r.get('exigencia') or 70.00)
             r['alumno'] = {'nombre': r['alumno_nombre'], 'apellido': r['alumno_apellido'], 'nombre_completo': f"{r['alumno_nombre']} {r['alumno_apellido']}"}
             r['curso'] = {'nombre': r['curso_nombre']}
 
@@ -431,6 +462,8 @@ def listar_evaluaciones():
             evaluaciones = [e for e in evaluaciones if e['id'] in eval_ids_con_inasistencias]
 
         for ev in evaluaciones:
+            ev['fecha'] = format_date_val(ev.get('fecha'))
+            ev['hora'] = format_time_val(ev.get('hora'))
             ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
             ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
             ev['curso'] = {'nombre': ev['curso_nombre']}
@@ -556,6 +589,8 @@ def detalle_evaluacion(eval_id):
             flash('Evaluación no encontrada.', 'danger')
             return redirect(url_for('listar_evaluaciones'))
 
+        ev['fecha'] = format_date_val(ev.get('fecha'))
+        ev['hora'] = format_time_val(ev.get('hora'))
         ev['asignatura'] = {'nombre': ev.get('asignatura_nombre') or 'General', 'color': ev.get('asignatura_color') or '#14213D'}
         prof_nombre = f"{ev.get('profe_nombre') or ''} {ev.get('profe_apellido') or ''}".strip() or 'Docente'
         ev['profesor'] = {'nombre_completo': prof_nombre}
@@ -564,7 +599,7 @@ def detalle_evaluacion(eval_id):
         # Alumnos del curso
         cursor.execute("""
             SELECT id, rut, nombre, apellido, 
-                   CONCAT(COALESCE(nombre, ''), ' ', COALESCE(apellido, '')) as nombre_completo
+                    CONCAT(COALESCE(nombre, ''), ' ', COALESCE(apellido, '')) as nombre_completo
             FROM alumnos
             WHERE curso_id = %s
             ORDER BY apellido ASC, nombre ASC
@@ -599,6 +634,7 @@ def detalle_evaluacion(eval_id):
             ]
 
     conn.close()
+    hoy = date.today().strftime('%Y-%m-%d')
     return render_template(
         'evaluaciones/detalle.html',
         title=ev['titulo'],
@@ -607,7 +643,8 @@ def detalle_evaluacion(eval_id):
         evaluacion=ev,
         alumnos=alumnos,
         alumnos_afectados=alumnos_afectados,
-        asistencias=asistencias_map
+        asistencias=asistencias_map,
+        hoy=hoy
     )
 
 @app.route('/evaluaciones/<int:eval_id>/asistencia', methods=['POST'])
@@ -682,6 +719,20 @@ def asistencia_evaluacion(eval_id):
                     INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, estado_asistencia, presente, justificado, motivo_inasistencia)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """, (eval_id, aid, estado_final, presente, justificado, motivo))
+
+            # Sincronizar automáticamente cualquier recuperación existente del alumno para esta prueba
+            if estado_final in ('justificado', 'salida'):
+                cursor.execute("""
+                    UPDATE recuperaciones
+                    SET exigencia = 60.00
+                    WHERE evaluacion_id = %s AND alumno_id = %s
+                """, (eval_id, aid))
+            elif estado_final == 'injustificada':
+                cursor.execute("""
+                    UPDATE recuperaciones
+                    SET exigencia = 70.00
+                    WHERE evaluacion_id = %s AND alumno_id = %s
+                """, (eval_id, aid))
 
         # Si el profesor guarda, se marca la evaluación como asistencia cerrada
         if user_rol == 'profe':
@@ -786,6 +837,8 @@ def editar_evaluacion(eval_id):
         asignaturas = cursor.fetchall()
 
     conn.close()
+    ev['fecha'] = format_date_val(ev.get('fecha'))
+    ev['hora'] = format_time_val(ev.get('hora'))
     ev['asignatura'] = {'nombre': ev['asignatura_nombre'], 'color': ev['asignatura_color']}
     ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
     ev['curso'] = {'nombre': ev['curso_nombre'], 'nivel': ev.get('curso_nivel', 'Media')}
@@ -867,9 +920,11 @@ def listar_recuperaciones():
         recuperaciones = cursor.fetchall()
 
         for r in recuperaciones:
+            r['fecha_recuperacion'] = format_date_val(r.get('fecha_recuperacion'))
+            r['eval_fecha'] = format_date_val(r.get('eval_fecha'))
             r['alumno'] = {'nombre_completo': f"{r['alumno_nombre']} {r['alumno_apellido']}", 'rut': r['alumno_rut'], 'curso': {'nombre': r['curso_nombre']}}
             r['evaluacion'] = {'titulo': r['eval_titulo'], 'fecha': r['eval_fecha'], 'asignatura': {'nombre': r['asignatura_nombre']}}
-            r['porcentaje_exigencia'] = float(r.get('exigencia') or r.get('porcentaje_exigencia') or 60)
+            r['porcentaje_exigencia'] = float(r.get('exigencia') or r.get('porcentaje_exigencia') or 70.00)
 
     conn.close()
     return render_template(
@@ -894,18 +949,25 @@ def crear_recuperacion():
         evaluacion_id = request.form.get('evaluacion_id')
         alumno_id = request.form.get('alumno_id')
         fecha_recup = request.form.get('fecha_recuperacion')
+        hora_recup = request.form.get('hora_recuperacion', '').strip()
+        indicaciones = request.form.get('indicaciones', '').strip()
         motivo = request.form.get('motivo', '').strip()
 
-        # Revisar si la inasistencia estaba justificada
+        if indicaciones and not motivo:
+            motivo = indicaciones
+        if hora_recup:
+            motivo = f"{motivo} [{hora_recup}]".strip() if motivo else f"[{hora_recup}]"
+
+        # Revisar si la inasistencia ya estaba justificada previamente por Inspectoría
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT justificado FROM asistencia_evaluaciones
+                SELECT justificado, estado_asistencia FROM asistencia_evaluaciones
                 WHERE evaluacion_id = %s AND alumno_id = %s
             """, (evaluacion_id, alumno_id))
             asist = cursor.fetchone()
 
-            # Regla de exigencia: 60% justificado, 70% injustificado
-            exigencia = 60.00 if (asist and asist['justificado']) else 70.00
+            # Regla institucional: el profesor programa con 70%; pasa al 60% al presentar justificado en Inspectoría
+            exigencia = 60.00 if (asist and (asist.get('justificado') or asist.get('estado_asistencia') in ('justificado', 'salida'))) else 70.00
 
             cursor.execute("""
                 INSERT INTO recuperaciones (evaluacion_id, alumno_id, fecha_recuperacion, motivo, exigencia, estado)
@@ -914,7 +976,7 @@ def crear_recuperacion():
             conn.commit()
 
         conn.close()
-        flash(f'Recuperación agendada con éxito ({int(exigencia)}% de exigencia).', 'success')
+        flash(f'Evaluación recuperativa agendada con éxito ({int(exigencia)}% de exigencia inicial).', 'success')
         return redirect(url_for('listar_recuperaciones'))
 
     with conn.cursor() as cursor:
@@ -932,6 +994,8 @@ def crear_recuperacion():
         cursor.execute(query_evals, params_evals)
         evaluaciones = cursor.fetchall()
         for ev in evaluaciones:
+            ev['fecha'] = format_date_val(ev.get('fecha'))
+            ev['hora'] = format_time_val(ev.get('hora'))
             ev['curso'] = {'nombre': ev['curso_nombre']}
             ev['asignatura'] = {'nombre': ev['asignatura_nombre']}
 
@@ -1118,16 +1182,37 @@ def perfil_alumno(alumno_id):
         alumno['curso'] = {'nombre': alumno['curso_nombre'], 'nivel': alumno['curso_nivel']}
         alumno['nombre_completo'] = f"{alumno['nombre']} {alumno['apellido']}"
 
-        # Inasistencias y recuperaciones
+        # Historial completo de asistencias a evaluaciones
         cursor.execute("""
-            SELECT ae.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha, asig.nombre AS asignatura_nombre
+            SELECT ae.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha,
+                   asig.nombre AS asignatura_nombre, asig.color AS asignatura_color
             FROM asistencia_evaluaciones ae
             JOIN evaluaciones e ON ae.evaluacion_id = e.id
-            JOIN asignaturas asig ON e.asignatura_id = asig.id
-            WHERE ae.alumno_id = %s AND ae.presente = 0
+            LEFT JOIN asignaturas a ON e.asignatura_id = a.id
+            LEFT JOIN asignaturas asig ON e.asignatura_id = asig.id
+            WHERE ae.alumno_id = %s
             ORDER BY e.fecha DESC
         """, (alumno_id,))
-        inasistencias = cursor.fetchall()
+        raw_asistencias = cursor.fetchall()
+        asistencias = []
+        for row in raw_asistencias:
+            asistencias.append({
+                'asistencia': {
+                    'presente': row.get('presente', 1),
+                    'justificado': row.get('justificado', 0),
+                    'motivo': row.get('motivo_inasistencia') or '',
+                    'estado_asistencia': row.get('estado_asistencia') or ('justificado' if row.get('justificado') else ('presente' if row.get('presente') else 'injustificada'))
+                },
+                'evaluacion': {
+                    'id': row['evaluacion_id'],
+                    'titulo': row['eval_titulo'],
+                    'fecha': format_date_val(row['eval_fecha']),
+                    'asignatura': {
+                        'nombre': row.get('asignatura_nombre') or 'General',
+                        'color': row.get('asignatura_color') or '#14213D'
+                    }
+                }
+            })
 
         cursor.execute("""
             SELECT r.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha
@@ -1137,6 +1222,15 @@ def perfil_alumno(alumno_id):
             ORDER BY r.fecha_recuperacion DESC
         """, (alumno_id,))
         recuperaciones = cursor.fetchall()
+        for r in recuperaciones:
+            r['fecha_recuperacion'] = format_date_val(r.get('fecha_recuperacion'))
+            r['eval_fecha'] = format_date_val(r.get('eval_fecha'))
+            r['porcentaje_exigencia'] = float(r.get('exigencia') or 70.00)
+
+        cursor.execute("SELECT COUNT(*) AS cnt FROM evaluaciones WHERE curso_id = %s", (alumno['curso_id'],))
+        row_evals = cursor.fetchone()
+        total_evals = row_evals['cnt'] if row_evals else 0
+        total_ausencias = sum(1 for a in asistencias if not a['asistencia']['presente'])
 
     conn.close()
     return render_template(
@@ -1144,8 +1238,11 @@ def perfil_alumno(alumno_id):
         title=alumno['nombre_completo'],
         active='alumnos',
         alumno=alumno,
-        inasistencias=inasistencias,
-        recuperaciones=recuperaciones
+        asistencias=asistencias,
+        inasistencias=[a for a in asistencias if not a['asistencia']['presente']],
+        recuperaciones=recuperaciones,
+        total_evals=total_evals,
+        total_ausencias=total_ausencias
     )
 
 # -------------------------------------------------------------
@@ -1228,29 +1325,60 @@ def reporte_calendario():
 @login_required
 def reporte_pendientes():
     conn = get_db_connection()
+    user = session.get('user', {})
     with conn.cursor() as cursor:
-        cursor.execute("""
-            SELECT r.*, e.titulo AS eval_titulo, al.nombre AS alumno_nombre, al.apellido AS alumno_apellido,
-                   al.rut AS alumno_rut, c.nombre AS curso_nombre, asig.nombre AS asignatura_nombre
+        query = """
+            SELECT r.*, e.titulo AS eval_titulo, e.fecha AS eval_fecha,
+                   al.nombre AS alumno_nombre, al.apellido AS alumno_apellido,
+                   al.rut AS alumno_rut, c.nombre AS curso_nombre, asig.nombre AS asignatura_nombre,
+                   p.nombre AS profe_nombre, p.apellido AS profe_apellido
             FROM recuperaciones r
             JOIN evaluaciones e ON r.evaluacion_id = e.id
             JOIN alumnos al ON r.alumno_id = al.id
             JOIN cursos c ON al.curso_id = c.id
             JOIN asignaturas asig ON e.asignatura_id = asig.id
+            LEFT JOIN profesores p ON e.profesor_id = p.id
             WHERE r.estado = 'pendiente'
-            ORDER BY r.fecha_recuperacion ASC
-        """)
+        """
+        params = []
+        if user.get('rol') == 'profe' and user.get('profesor_id'):
+            query += " AND e.profesor_id = %s"
+            params.append(user['profesor_id'])
+        query += " ORDER BY r.fecha_recuperacion ASC"
+        cursor.execute(query, params)
         pendientes = cursor.fetchall()
+
+        alumnos_por_eval = {}
         for r in pendientes:
-            r['alumno'] = {'nombre_completo': f"{r['alumno_nombre']} {r['alumno_apellido']}", 'rut': r['alumno_rut'], 'curso': {'nombre': r['curso_nombre']}}
-            r['evaluacion'] = {'titulo': r['eval_titulo'], 'asignatura': {'nombre': r['asignatura_nombre']}}
+            r['alumno'] = {
+                'nombre_completo': f"{r['alumno_nombre']} {r['alumno_apellido']}",
+                'rut': r['alumno_rut'],
+                'curso': {'nombre': r['curso_nombre']}
+            }
+            prof_nom = f"{r.get('profe_nombre') or ''} {r.get('profe_apellido') or ''}".strip()
+            r['evaluacion'] = {
+                'id': r['evaluacion_id'],
+                'titulo': r['eval_titulo'],
+                'fecha': format_date_val(r.get('eval_fecha')),
+                'asignatura': {'nombre': r['asignatura_nombre']},
+                'curso': {'nombre': r['curso_nombre']},
+                'profesor': {'nombre_completo': prof_nom or 'Docente'}
+            }
+            r['fecha_recuperacion'] = format_date_val(r.get('fecha_recuperacion'))
+            r['porcentaje_exigencia'] = float(r.get('exigencia') or 70.00)
+
+            ev_id = r['evaluacion_id']
+            if ev_id not in alumnos_por_eval:
+                alumnos_por_eval[ev_id] = []
+            alumnos_por_eval[ev_id].append(r)
     conn.close()
 
     return render_template(
         'reportes/pendientes.html',
         title='Alumnos con Evaluaciones Pendientes',
         active='pendientes',
-        pendientes=pendientes
+        pendientes=pendientes,
+        alumnos_por_eval=alumnos_por_eval
     )
 
 @app.route('/reportes/carga')

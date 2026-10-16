@@ -1,58 +1,115 @@
 {% extends 'base.html' %}
 {% block content %}
 
-
 <div class="row justify-content-center">
     <div class="col-12 col-md-10 col-lg-8 col-xl-7">
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <h5 class="card-title mb-0"><i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Asignar Fecha de Recuperación</h5>
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="card-title mb-0 fw-bold">
+                    <i class="bi bi-calendar-plus me-2 text-warning"></i>Programar Evaluación Recuperativa
+                </h5>
+                <span class="badge bg-warning text-dark px-3 py-2">
+                    <i class="bi bi-person-workspace me-1"></i>Perfil Docente
+                </span>
             </div>
-            <div class="card-body">
-                <form method="POST" action="/recuperaciones/crear">
-                    <div class="alert alert-info small mb-3">
-                        <i class="bi bi-info-circle me-1"></i>
-                        La exigencia de la recuperación se calcula automáticamente según la normativa: si Inspectoría/UTP marcó la inasistencia como <strong>justificada</strong>, el alumno rinde con un <strong>60%</strong> de exigencia. Si la inasistencia no fue justificada, rinde con un <strong>70%</strong> de exigencia.
+            <div class="card-body p-3 p-md-4">
+                <!-- Marco Normativo Institucional -->
+                <div class="alert alert-warning bg-warning bg-opacity-10 border-warning border-opacity-25 mb-4">
+                    <div class="d-flex gap-2">
+                        <i class="bi bi-info-circle-fill fs-5 text-warning flex-shrink-0 mt-1"></i>
+                        <div class="small">
+                            <strong class="d-block mb-1 text-dark">Reglamento de Evaluaciones y Recuperativas:</strong>
+                            <ul class="mb-0 ps-3 text-secondary">
+                                <li><strong>Exigencia Inicial (70%):</strong> La evaluación recuperativa se genera automáticamente con <span class="badge bg-danger">70% de exigencia</span> (inasistencia sin justificar).</li>
+                                <li><strong>Acreditación en Inspectoría:</strong> Si el estudiante o apoderado presenta certificado médico ante <strong>Inspectoría General</strong>, Inspectoría validará el documento y el sistema rebajará automáticamente la exigencia al <span class="badge bg-success">60% regular</span>.</li>
+                            </ul>
+                        </div>
                     </div>
+                </div>
+
+                <form method="POST" action="/recuperaciones/crear" id="formRecuperacion">
                     <div class="row g-3">
+                        <!-- Selección de Evaluación -->
                         <div class="col-12">
-                            <label class="form-label">Evaluación original <span class="text-danger">*</span></label>
+                            <label class="form-label fw-semibold">1. Evaluación Original <span class="text-danger">*</span></label>
                             <select name="evaluacion_id" id="evalSelect" class="form-select" required>
-                                <option value="">Seleccionar evaluación...</option>
+                                <option value="">-- Seleccionar evaluación original del curso --</option>
                                 {% for ev in evaluaciones %}
-                                <option value="{{ ev.id }}">{{ ev.titulo }} — {{ ev.curso.nombre if (ev.curso and ev.curso.nombre) else (ev.curso_nombre or 'Curso') }} ({{ ev.fecha }})</option>
+                                    {% set cursoNombre = ev.curso.nombre if (ev.curso and ev.curso.nombre) else (ev.curso_nombre or 'Curso') %}
+                                    {% set asigNombre = ev.asignatura.nombre if (ev.asignatura and ev.asignatura.nombre) else (ev.asignatura_nombre or 'Asignatura') %}
+                                    <option value="{{ ev.id }}"
+                                            data-curso-id="{{ ev.curso_id }}"
+                                            {% if evaluacion_id_preselect and evaluacion_id_preselect == ev.id %}selected{% endif %}>
+                                        {{ ev.titulo }} • {{ cursoNombre }} ({{ ev.fecha }}) — [{{ asigNombre }}]
+                                    </option>
                                 {% endfor %}
                             </select>
                         </div>
+
+                        <!-- Selección de Alumno -->
                         <div class="col-12">
-                            <label class="form-label">Alumno <span class="text-danger">*</span></label>
-                            <select name="alumno_id" class="form-select" required>
-                                <option value="">Seleccionar alumno...</option>
+                            <label class="form-label fw-semibold">2. Estudiante Ausente a Evaluar <span class="text-danger">*</span></label>
+                            <select name="alumno_id" id="alumnoSelect" class="form-select" required>
+                                <option value="">-- Seleccionar estudiante ausente --</option>
                                 {% for a in alumnos %}
-                                <option value="{{ a.id }}" {% if alumno_id_preselect == a.id %}selected{% endif %}>{{ a.nombre_completo if a.nombre_completo else (a.nombre ~ ' ' ~ a.apellido) }} — {{ a.curso.nombre if (a.curso and a.curso.nombre) else (a.curso_nombre or '') }}</option>
+                                    {% set cursoAlumno = a.curso.nombre if (a.curso and a.curso.nombre) else (a.curso_nombre or '') %}
+                                    <option value="{{ a.id }}"
+                                            data-curso-id="{{ a.curso_id }}"
+                                            {% if alumno_id_preselect and alumno_id_preselect == a.id %}selected{% endif %}>
+                                        {{ a.nombre_completo if a.nombre_completo else (a.nombre ~ ' ' ~ a.apellido) }} ({{ a.rut }}){% if cursoAlumno %} — Curso {{ cursoAlumno }}{% endif %}
+                                    </option>
                                 {% endfor %}
                             </select>
+                            <div class="form-text" id="filtroTextoAyuda">Al seleccionar una evaluación, se destacarán los estudiantes de ese curso en color azul.</div>
                         </div>
-                        <div class="col-12 col-sm-6">
-                            <label class="form-label">Fecha de recuperación <span class="text-danger">*</span></label>
+
+                        <!-- Fecha de Recuperación -->
+                        <div class="col-12 col-md-7">
+                            <label class="form-label fw-semibold">3. Fecha de Rendición de la Recuperativa <span class="text-danger">*</span></label>
                             <input type="date" name="fecha_recuperacion" class="form-control" required min="{{ hoy }}" value="{{ hoy }}">
+                            <div class="form-text">Día en que el estudiante deberá presentarse a rendir la prueba.</div>
                         </div>
-                        <div class="col-12 col-sm-6">
-                            <label class="form-label">Exigencia reglamentaria</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="bi bi-shield-check"></i></span>
-                                <input type="text" class="form-control bg-light" value="Automática (60% / 70%)" readonly>
+
+                        <!-- Hora / Bloque opcional -->
+                        <div class="col-12 col-md-5">
+                            <label class="form-label fw-semibold">4. Hora / Bloque o Sala <span class="text-muted small">(Opcional)</span></label>
+                            <input type="text" name="hora_recuperacion" class="form-control" placeholder="Ej: 14:15 hrs o Bloque 3">
+                        </div>
+
+                        <!-- Indicaciones pedagógicas o temario -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">5. Indicaciones o Temario para el Estudiante <span class="text-muted small">(Opcional)</span></label>
+                            <input type="text" name="indicaciones" id="indicacionesInput" class="form-control"
+                                   placeholder="Ej: Traer calculadora y regla; temario: Unidad 2 Leyes de Newton.">
+                            <div class="form-text">Instrucciones o materiales que el estudiante verá en su citación.</div>
+                        </div>
+
+                        <!-- Cuadro informativo de exigencia automática -->
+                        <div class="col-12">
+                            <div class="p-3 rounded border bg-danger-subtle border-danger text-danger-emphasis d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center gap-3">
+                                    <i class="bi bi-shield-exclamation fs-3 text-danger"></i>
+                                    <div>
+                                        <div class="fw-bold">Exigencia Asignada Inicialmente: 70%</div>
+                                        <div class="small text-muted">
+                                            La citación se registra con 70%. Cuando el estudiante acredite su certificado médico en <strong>Inspectoría General</strong>, la exigencia pasará de inmediato al 60%.
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="badge bg-danger fs-5 px-3 py-2">70%</span>
                             </div>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label">Motivo o justificación</label>
-                            <input type="text" name="motivo" class="form-control" placeholder="Ej: Ausencia por licencia médica, inasistencia justificada...">
-                        </div>
                     </div>
-                    <hr>
-                    <div class="d-flex flex-wrap justify-content-end gap-2">
-                        <a href="/recuperaciones" class="btn btn-outline-secondary w-100 w-sm-auto text-center">Cancelar</a>
-                        <button type="submit" class="btn btn-warning w-100 w-sm-auto"><i class="bi bi-check-lg me-1"></i>Asignar Recuperación</button>
+
+                    <hr class="my-4">
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <a href="/recuperaciones" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Volver a Recuperaciones
+                        </a>
+                        <button type="submit" class="btn btn-warning px-4 fw-bold shadow-sm">
+                            <i class="bi bi-calendar-plus me-1"></i> Programar Evaluación Recuperativa
+                        </button>
                     </div>
                 </form>
             </div>
@@ -60,6 +117,35 @@
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const evalSelect = document.getElementById('evalSelect');
+    const alumnoSelect = document.getElementById('alumnoSelect');
 
+    function sincronizarAlumnosPorCurso() {
+        const selectedOption = evalSelect.options[evalSelect.selectedIndex];
+        const cursoId = selectedOption ? selectedOption.getAttribute('data-curso-id') : null;
+        if (!cursoId) return;
 
+        let primeraCoincidencia = null;
+        for (let i = 0; i < alumnoSelect.options.length; i++) {
+            const opt = alumnoSelect.options[i];
+            const optCurso = opt.getAttribute('data-curso-id');
+            if (optCurso === cursoId) {
+                opt.style.fontWeight = 'bold';
+                opt.style.color = '#0d6efd';
+                if (!primeraCoincidencia && opt.value) {
+                    primeraCoincidencia = opt.value;
+                }
+            } else {
+                opt.style.fontWeight = 'normal';
+                opt.style.color = '';
+            }
+        }
+    }
+
+    evalSelect.addEventListener('change', sincronizarAlumnosPorCurso);
+    sincronizarAlumnosPorCurso();
+});
+</script>
 {% endblock %}
