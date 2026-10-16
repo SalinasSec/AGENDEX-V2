@@ -662,6 +662,13 @@ def asistencia_evaluacion(eval_id):
             return redirect(url_for('listar_evaluaciones'))
 
         user_rol = session['user']['rol']
+        user_prof_id = session['user'].get('profesor_id')
+
+        # Si el profesor no es el docente titular asignado a la evaluación, se bloquea
+        if user_rol == 'profe' and str(user_prof_id) != str(ev.get('profesor_id')):
+            conn.close()
+            flash('Acceso denegado: Solo el docente titular asignado a esta asignatura/evaluación puede registrar la lista de asistencia.', 'danger')
+            return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
 
         # Si el profesor intenta modificar una lista ya guardada, se bloquea
         if user_rol == 'profe' and ev.get('asistencia_guardada'):
@@ -957,6 +964,16 @@ def crear_recuperacion():
             motivo = indicaciones
         if hora_recup:
             motivo = f"{motivo} [{hora_recup}]".strip() if motivo else f"[{hora_recup}]"
+
+        # Validar que si es profesor, solo pueda agendar recuperaciones de sus propias evaluaciones
+        if session['user']['rol'] == 'profe' and session['user'].get('profesor_id'):
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT profesor_id FROM evaluaciones WHERE id = %s", (evaluacion_id,))
+                ev_tit = cursor.fetchone()
+                if ev_tit and str(ev_tit['profesor_id']) != str(session['user']['profesor_id']):
+                    conn.close()
+                    flash('Acceso denegado: Solo el docente titular de la evaluación puede programar sus recuperaciones.', 'danger')
+                    return redirect(url_for('listar_recuperaciones'))
 
         # Revisar si la inasistencia ya estaba justificada previamente por Inspectoría
         with conn.cursor() as cursor:

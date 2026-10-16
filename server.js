@@ -771,6 +771,12 @@ app.post('/evaluaciones/:id/asistencia', requireAuth, requireRole('profe', 'utp'
       return res.redirect(`/evaluaciones/${evalId}`);
     }
 
+    // Solo el docente titular asignado a la materia puede pasar o registrar asistencia
+    if (isProfesor && String(user.profesor_id) !== String(ev.profesor_id)) {
+      req.flash('danger', 'Acceso denegado: Solo el docente titular asignado a esta asignatura/evaluación puede registrar la lista de asistencia.');
+      return res.redirect(`/evaluaciones/${evalId}`);
+    }
+
     const alumnos = store.getAlumnosByCurso(ev.curso_id);
 
     alumnos.forEach(alumno => {
@@ -1031,6 +1037,18 @@ app.post('/recuperaciones/crear', requireAuth, requireRole('profe'), (req, res) 
   if (!evaluacion_id || !alumno_id || !fecha_recuperacion) {
     req.flash('danger', 'Debes seleccionar la evaluación original, el alumno ausente y la fecha de citación.');
     return res.redirect('/recuperaciones/crear');
+  }
+
+  const evOriginal = store.getEvaluacion(eId);
+  if (!evOriginal) {
+    req.flash('danger', 'La evaluación original no fue encontrada.');
+    return res.redirect('/recuperaciones/crear');
+  }
+
+  // Si es profesor, solo puede agendar recuperaciones de sus propias evaluaciones
+  if (req.session.user.profesor_id && String(req.session.user.profesor_id) !== String(evOriginal.profesor_id)) {
+    req.flash('danger', 'Acceso denegado: Solo el docente titular de la asignatura puede programar recuperaciones para esta evaluación.');
+    return res.redirect('/recuperaciones');
   }
 
   // Regla Institucional Liceo:

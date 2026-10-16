@@ -184,8 +184,94 @@
                     </form>
                     <% } %>
 
+                <% } else if (current_user.rol === 'profe' && String(current_user.profesor_id) !== String(ev.profesor_id)) { %>
+                    <!-- Panel para Profesor Observador (No es el docente titular de esta prueba) -->
+                    <div class="alert alert-secondary bg-light border d-flex flex-wrap align-items-center justify-content-between p-3 mb-3 gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-eye text-primary fs-3 me-1"></i>
+                            <div>
+                                <strong class="d-block text-dark">Modo Solo Consulta: Asignatura de <%= ev.profesor ? ev.profesor.nombre_completo : 'otro docente' %></strong>
+                                <span class="small text-muted">
+                                    Esta evaluación corresponde a la asignatura de <strong><%= ev.profesor ? ev.profesor.nombre_completo : 'otro docente' %></strong>. Puedes consultar la nómina y calendarización para coordinación académica, pero el pase de lista y registro de asistencia corresponde únicamente al docente titular asignado.
+                                </span>
+                            </div>
+                        </div>
+                        <span class="badge bg-secondary px-3 py-2"><i class="bi bi-lock me-1"></i>Solo Consulta</span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 table-stack-mobile">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th>Alumno</th>
+                                    <th>RUT</th>
+                                    <th>Condición de Asistencia</th>
+                                    <th>Observación</th>
+                                    <th class="text-center">Exigencia Recup.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% alumnos.forEach((alumno, idx) => { %>
+                                <% 
+                                    const asist = asistencias[alumno.id]; 
+                                    let estadoActual = 'pendiente_docente';
+                                    if (ev.asistencia_guardada) {
+                                        if (asist) {
+                                            if (asist.estado_asistencia) estadoActual = asist.estado_asistencia;
+                                            else if (asist.justificado) estadoActual = 'justificado';
+                                            else if (!asist.presente) estadoActual = 'injustificada';
+                                            else estadoActual = 'presente';
+                                        } else {
+                                            estadoActual = 'presente';
+                                        }
+                                    }
+                                %>
+                                <tr>
+                                    <td class="text-muted small"><%= idx + 1 %></td>
+                                    <td>
+                                        <div class="fw-semibold"><%= alumno.nombre_completo %></div>
+                                    </td>
+                                    <td class="text-muted small font-monospace"><%= alumno.rut %></td>
+                                    <td>
+                                        <% if (!ev.asistencia_guardada) { %>
+                                        <span class="badge bg-light text-muted border">
+                                            <i class="bi bi-clock me-1"></i>Pendiente por <%= ev.profesor ? ev.profesor.nombre_completo : 'docente titular' %>
+                                        </span>
+                                        <% } else if (estadoActual === 'presente') { %>
+                                        <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Presente</span>
+                                        <% } else if (estadoActual === 'injustificada') { %>
+                                        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Inasistencia</span>
+                                        <% } else if (estadoActual === 'salida') { %>
+                                        <span class="badge bg-info text-dark"><i class="bi bi-bus-front me-1"></i>Salida Pedagógica</span>
+                                        <% } else { %>
+                                        <span class="badge bg-success"><i class="bi bi-file-earmark-medical me-1"></i>Justificado</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-muted small"><%= (asist && asist.motivo) ? asist.motivo : '-' %></td>
+                                    <td class="text-center">
+                                        <% if (!ev.asistencia_guardada || estadoActual === 'presente') { %>
+                                        <span class="text-muted small">&mdash;</span>
+                                        <% } else if (estadoActual === 'injustificada') { %>
+                                        <span class="badge bg-danger">70%</span>
+                                        <% } else { %>
+                                        <span class="badge bg-success">60%</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                        <a href="/evaluaciones" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left me-1"></i>Volver a Evaluaciones
+                        </a>
+                    </div>
+
                 <% } else if (current_user.rol === 'profe') { %>
-                    <!-- Panel para Profesor -->
+                    <!-- Panel para Profesor Titular de la evaluación -->
                     <% if (ev.fecha > hoy) { %>
                     <!-- Caso 1: La evaluación es para una fecha futura -->
                     <div class="alert alert-primary bg-primary bg-opacity-10 border-primary border-opacity-25 py-3 mb-3">
