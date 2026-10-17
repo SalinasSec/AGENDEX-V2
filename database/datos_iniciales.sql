@@ -56,7 +56,7 @@ INSERT INTO usuarios (rut, correo, clave, nombre, rol, profesor_id, alumno_id, a
 ('15.111.222-3', 'carolina.reyes@liceosofofa.cl', 'profe123', 'Prof. Carolina Reyes', 'profe', 3, NULL, 1),
 ('18.777.888-9', 'inspe.diaz@liceorbl.cl', 'inspe123', 'Claudia Díaz (Inspectoría)', 'inspe', NULL, NULL, 1),
 ('20.123.456-1', 'joaquin.rivas@liceorbl.cl', 'alumno123', 'Joaquín Rivas (Alumno 4°G)', 'alumno', NULL, 1, 1)
-ON DUPLICATE KEY UPDATE clave=VALUES(clave), nombre=VALUES(nombre), rol=VALUES(rol);
+ON DUPLICATE KEY UPDATE clave=VALUES(clave), nombre=VALUES(nombre), rol=VALUES(rol), profesor_id=VALUES(profesor_id), alumno_id=VALUES(alumno_id);
 
 -- 6. Evaluaciones de muestra
 INSERT INTO evaluaciones (id, titulo, descripcion, fecha, hora, asignatura_id, curso_id, profesor_id) VALUES

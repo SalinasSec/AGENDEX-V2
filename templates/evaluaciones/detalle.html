@@ -125,7 +125,7 @@
                                 </thead>
                                 <tbody>
                                     {% for alumno in alumnos_afectados %}
-                                    {% set asist = asistencias.get(alumno.id) %}
+                                    {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
                                     {% set estado_actual = asist.estado_asistencia if asist and asist.estado_asistencia else 'injustificada' %}
                                     <tr>
                                         <td>
@@ -194,7 +194,7 @@
                             </thead>
                             <tbody>
                                 {% for alumno in alumnos %}
-                                {% set asist = asistencias.get(alumno.id) %}
+                                {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
                                 {% set estado_actual = 'pendiente_docente' %}
                                 {% if ev.asistencia_guardada %}
                                     {% if asist and asist.estado_asistencia %}
@@ -323,7 +323,7 @@
                             </thead>
                             <tbody>
                                 {% for alumno in alumnos %}
-                                {% set asist = asistencias.get(alumno.id) %}
+                                {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
                                 {% set estado_actual = asist.estado_asistencia if asist and asist.estado_asistencia else 'presente' %}
                                 <tr>
                                     <td>
@@ -384,7 +384,7 @@
                                 </thead>
                                 <tbody>
                                     {% for alumno in alumnos %}
-                                    {% set asist = asistencias.get(alumno.id) %}
+                                    {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
                                     {% set estado_actual = asist.estado_asistencia if asist and asist.estado_asistencia else 'presente' %}
                                     <tr>
                                         <td>
@@ -449,7 +449,7 @@
                             </thead>
                             <tbody>
                                 {% for alumno in alumnos %}
-                                {% set asist = asistencias.get(alumno.id) %}
+                                {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
                                 {% set estado_actual = asist.estado_asistencia if asist and asist.estado_asistencia else 'presente' %}
                                 <tr>
                                     <td><strong>{{ alumno.nombre_completo }}</strong></td>

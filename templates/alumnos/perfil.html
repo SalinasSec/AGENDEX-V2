@@ -73,22 +73,22 @@
                         <tbody>
                             {% for item in asistencias %}
                             <tr>
-                                <td>{{ item.evaluacion.fecha }}</td>
+                                <td>{{ item.evaluacion.fecha if (item.evaluacion and item.evaluacion.fecha) else (item.eval_fecha or '') }}</td>
                                 <td>
-                                    <a href="/evaluaciones/{{ item.evaluacion.id }}" class="text-decoration-none fw-semibold">{{ item.evaluacion.titulo }}</a>
+                                    <a href="/evaluaciones/{{ item.evaluacion.id if (item.evaluacion and item.evaluacion.id) else (item.evaluacion_id or '#') }}" class="text-decoration-none fw-semibold">{{ item.evaluacion.titulo if (item.evaluacion and item.evaluacion.titulo) else (item.eval_titulo or 'Evaluación') }}</a>
                                 </td>
-                                <td><span class="badge" style="background:{{ item.evaluacion.asignatura.color }};">{{ item.evaluacion.asignatura.nombre }}</span></td>
+                                <td><span class="badge" style="background:{{ item.evaluacion.asignatura.color if (item.evaluacion and item.evaluacion.asignatura and item.evaluacion.asignatura.color) else '#14213D' }};">{{ item.evaluacion.asignatura.nombre if (item.evaluacion and item.evaluacion.asignatura and item.evaluacion.asignatura.nombre) else 'General' }}</span></td>
                                 <td>
-                                    {% if item.asistencia.presente %}
+                                    {% if (item.asistencia and item.asistencia.presente) or item.presente %}
                                     <span class="badge bg-success">Presente</span>
                                     {% else %}
                                     <span class="badge bg-danger">Ausente</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-muted small">{{ item.asistencia.motivo if item.asistencia.motivo else '-' }}</td>
+                                <td class="text-muted small">{{ (item.asistencia.motivo if (item.asistencia and item.asistencia.motivo) else item.motivo_inasistencia) or '-' }}</td>
                                 <td>
-                                    {% if not item.asistencia.presente %}
-                                        {% if item.asistencia.justificado %}
+                                    {% if not ((item.asistencia and item.asistencia.presente) or item.presente) %}
+                                        {% if (item.asistencia and item.asistencia.justificado) or item.justificado %}
                                         <span class="badge bg-success">Sí (60%)</span>
                                         {% else %}
                                         <span class="badge bg-secondary">No (70%)</span>

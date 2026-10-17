@@ -8,17 +8,24 @@
     <div>
         <h4 class="mb-0">
             <i class="bi bi-clipboard-check me-2 text-primary"></i>
-            <%= current_user.rol === 'inspe' ? 'Evaluaciones con Inasistencias' : 'Evaluaciones' %>
+            <%= current_user.rol === 'inspe' ? 'Evaluaciones con Inasistencias' : (current_user.rol === 'profe' ? 'Mis Evaluaciones Asignadas' : 'Evaluaciones') %>
         </h4>
         <% if (current_user.rol === 'inspe') { %>
         <small class="text-muted">Mostrando únicamente las evaluaciones con estudiantes en condición de inasistencia</small>
+        <% } else if (current_user.rol === 'profe') { %>
+        <small class="text-muted">Mostrando exclusivamente las evaluaciones de tus asignaturas y cursos asignados</small>
         <% } %>
     </div>
-    <% if (current_user.rol === 'profe') { %>
-    <a href="/evaluaciones/crear" class="btn btn-primary">
-        <i class="bi bi-plus-circle me-1"></i>Nueva Evaluación
-    </a>
-    <% } %>
+    <div class="d-flex gap-2 flex-wrap">
+        <% if (current_user.rol === 'profe') { %>
+        <a href="/reportes/calendario" class="btn btn-outline-secondary">
+            <i class="bi bi-calendar3 me-1"></i>Calendario General
+        </a>
+        <a href="/evaluaciones/crear" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Nueva Evaluación
+        </a>
+        <% } %>
+    </div>
 </div>
 
 <!-- Filtros -->

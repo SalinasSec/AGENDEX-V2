@@ -431,14 +431,8 @@ class Store {
     if (!prof) return [];
 
     return this.evaluaciones.filter(e => {
-      // Si la evaluación fue creada o asignada formalmente a este profesor
-      if (e.profesor_id === prof.id) return true;
-
-      // O si pertenece a uno de sus cursos asignados y una de sus asignaturas asignadas
-      const tieneCurso = prof.cursos_asignados && prof.cursos_asignados.includes(e.curso_id);
-      const tieneAsignatura = prof.asignaturas_asignadas && prof.asignaturas_asignadas.includes(e.asignatura_id);
-
-      return Boolean(tieneCurso && tieneAsignatura);
+      // Estrictamente las evaluaciones asignadas a este profesor
+      return Number(e.profesor_id) === Number(prof.id);
     });
   }
 

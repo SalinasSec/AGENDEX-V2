@@ -167,6 +167,21 @@ def main():
         else:
             print(f"    [!] No se encontró {ruta_datos}")
 
+        # Asegurar vinculación correcta de cuentas a profesores
+        try:
+            cursor.execute("""
+                UPDATE usuarios u
+                JOIN profesores p ON LOWER(TRIM(u.correo)) = LOWER(TRIM(p.email))
+                SET u.profesor_id = p.id
+                WHERE u.rol = 'profe' AND (u.profesor_id IS NULL OR u.profesor_id = 0)
+            """)
+            cursor.execute("UPDATE usuarios SET profesor_id = 1 WHERE LOWER(correo) LIKE '%marcela%' AND (profesor_id IS NULL OR profesor_id = 0)")
+            cursor.execute("UPDATE usuarios SET profesor_id = 2 WHERE LOWER(correo) LIKE '%antonio%' AND (profesor_id IS NULL OR profesor_id = 0)")
+            cursor.execute("UPDATE usuarios SET profesor_id = 3 WHERE LOWER(correo) LIKE '%carolina%' AND (profesor_id IS NULL OR profesor_id = 0)")
+            print("    [OK] Perfiles de profesores y permisos vinculados correctamente.")
+        except Exception as e:
+            pass
+
     conexion.close()
 
     # Guardar archivo .env local para Flask

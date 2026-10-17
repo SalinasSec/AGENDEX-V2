@@ -1,5 +1,20 @@
 <%- include('partials/header', { title: 'Dashboard', active: 'dashboard' }) %>
 
+<% if (current_user && current_user.rol === 'profe') { %>
+<div class="alert alert-primary bg-primary bg-opacity-10 border border-primary border-opacity-25 d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded-3 gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-person-badge text-primary fs-4"></i>
+        <div>
+            <strong class="d-block text-dark">Panel Docente: <%= typeof mi_profesor !== 'undefined' && mi_profesor ? mi_profesor.nombre_completo : current_user.nombre %></strong>
+            <span class="small text-muted">
+                Visualizando exclusivamente las evaluaciones y estudiantes correspondientes a tus asignaturas y cursos asignados. Para coordinar fechas globales del liceo, consulta el <a href="/reportes/calendario" class="text-decoration-underline fw-semibold">Calendario General</a>.
+            </span>
+        </div>
+    </div>
+    <span class="badge bg-primary px-3 py-2"><i class="bi bi-check-circle me-1"></i>Mis Asignaturas</span>
+</div>
+<% } %>
+
 <div class="row g-3 mb-4">
     <!-- Stat 1: Evaluaciones hoy -->
     <div class="col-6 col-xl-3">

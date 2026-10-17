@@ -460,6 +460,8 @@ app.get('/', requireAuth, (req, res) => {
     };
   }).filter(x => x.count > 0).sort((a, b) => b.count - a.count);
 
+  const miProfesor = (req.session.user.rol === 'profe' && req.session.user.profesor_id) ? store.getProfesor(req.session.user.profesor_id) : null;
+
   res.render('dashboard', {
     title: 'Panel de Control',
     active: 'dashboard',
@@ -470,6 +472,7 @@ app.get('/', requireAuth, (req, res) => {
     evals_por_curso: evalsPorCurso,
     total_evaluaciones_activas: baseEvals.length,
     total_alumnos: store.alumnos.length,
+    mi_profesor: miProfesor,
     hoy
   });
 });
@@ -483,18 +486,13 @@ app.get('/evaluaciones', requireAuth, (req, res) => {
   let asignaturasFiltro = store.asignaturas;
   let rawList = store.evaluaciones;
 
-  // Si el usuario es un profesor, solo ve las evaluaciones de sus cursos y asignaturas asignadas
+  // Si el usuario es un profesor, solo ve las evaluaciones de sus materias y cursos asignados
   if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
     rawList = store.getEvaluacionesByProfesor(req.session.user.profesor_id);
-    const profObj = store.getProfesor(req.session.user.profesor_id);
-    if (profObj) {
-      if (profObj.cursos_asignados && profObj.cursos_asignados.length > 0) {
-        cursosFiltro = store.cursos.filter(c => profObj.cursos_asignados.includes(c.id));
-      }
-      if (profObj.asignaturas_asignadas && profObj.asignaturas_asignadas.length > 0) {
-        asignaturasFiltro = store.asignaturas.filter(a => profObj.asignaturas_asignadas.includes(a.id));
-      }
-    }
+    const cursosProfIds = new Set(rawList.map(e => e.curso_id));
+    const asigProfIds = new Set(rawList.map(e => e.asignatura_id));
+    cursosFiltro = store.cursos.filter(c => cursosProfIds.has(c.id));
+    asignaturasFiltro = store.asignaturas.filter(a => asigProfIds.has(a.id));
   }
 
   let list = rawList.map(e => store.getEvaluacion(e.id));
@@ -1103,6 +1101,16 @@ app.post('/recuperaciones/crear', requireAuth, requireRole('profe'), (req, res) 
 
 app.post('/recuperaciones/:id/completar', requireAuth, requireRole('profe'), (req, res) => {
   const id = Number(req.params.id);
+  const rec = store.recuperaciones.find(x => x.id === id);
+  if (!rec) {
+    req.flash('danger', 'Recuperación no encontrada.');
+    return res.redirect('/recuperaciones');
+  }
+  const ev = store.getEvaluacion(rec.evaluacion_id);
+  if (req.session.user.rol === 'profe' && ev && String(req.session.user.profesor_id) !== String(ev.profesor_id)) {
+    req.flash('danger', 'Acceso denegado: Solo el docente titular de la asignatura puede completar o calificar esta recuperación.');
+    return res.redirect('/recuperaciones');
+  }
   const r = store.actualizarEstadoRecuperacion(id, 'completada');
   const al = r && r.alumno ? r.alumno.nombre_completo : 'El estudiante';
   req.flash('success', `Evaluación recuperativa rendida y completada con éxito por ${al}.`);
@@ -1112,6 +1120,16 @@ app.post('/recuperaciones/:id/completar', requireAuth, requireRole('profe'), (re
 // Registrar inasistencia definitiva a la prueba recuperativa (Aplica nota 1.1)
 app.post('/recuperaciones/:id/no-presento', requireAuth, requireRole('profe'), (req, res) => {
   const id = Number(req.params.id);
+  const rec = store.recuperaciones.find(x => x.id === id);
+  if (!rec) {
+    req.flash('danger', 'Recuperación no encontrada.');
+    return res.redirect('/recuperaciones');
+  }
+  const ev = store.getEvaluacion(rec.evaluacion_id);
+  if (req.session.user.rol === 'profe' && ev && String(req.session.user.profesor_id) !== String(ev.profesor_id)) {
+    req.flash('danger', 'Acceso denegado: Solo el docente titular de la asignatura puede registrar el cierre de esta recuperación.');
+    return res.redirect('/recuperaciones');
+  }
   const r = store.actualizarEstadoRecuperacion(id, 'no_presento');
   if (r) {
     r.observacion_cierre = 'Estudiante no se presentó a rendir la evaluación recuperativa. Se aplica calificación mínima reglamentaria 1.1 según manual institucional.';

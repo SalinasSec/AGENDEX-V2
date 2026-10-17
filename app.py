@@ -69,9 +69,133 @@ def format_time_val(val):
 def str_date_filter(val):
     return format_date_val(val)
 
+# Mapeo oficial de asignaturas y cursos por profesor (Liceo Industrial Bicentenario RBL)
+PROFESORES_ASIGNACIONES = {
+    1: {  # Marcela Rubio
+        'cursos': [19, 26],  # 3°G, 4°G
+        'asignaturas': [7],   # M8: Desarrollo de Aplicaciones Web
+    },
+    2: {  # Antonio Velásquez
+        'cursos': [19, 26],  # 3°G, 4°G
+        'asignaturas': [8, 9, 10],  # M5: DBD, M6: POO, M7: ABD
+    },
+    3: {  # Carolina Reyes
+        'cursos': [1, 2, 7, 12, 19, 26],
+        'asignaturas': [2],  # Matemática
+    },
+    4: {  # Patricio Muñoz
+        'cursos': [1, 2, 7, 8, 19, 26],
+        'asignaturas': [1],  # Lenguaje y Comunicación
+    },
+    5: {  # Valentina Soto
+        'cursos': [1, 2, 7, 19],
+        'asignaturas': [3],  # Historia
+    },
+    6: {  # Diego Fuentes
+        'cursos': [1, 7, 19, 26],
+        'asignaturas': [4],  # Inglés
+    },
+    7: {  # Docente Aprestos
+        'cursos': [7, 8, 9, 10, 11, 12],  # 2A a 2F
+        'asignaturas': [11],  # Taller Aprestos Técnicos
+    }
+}
+
+def get_profesor_asignaciones(profesor_id, cursor=None):
+    if not profesor_id:
+        return {'cursos': [], 'asignaturas': []}
+    try:
+        p_id = int(profesor_id)
+    except (ValueError, TypeError):
+        return {'cursos': [], 'asignaturas': []}
+    asig = PROFESORES_ASIGNACIONES.get(p_id, {'cursos': [], 'asignaturas': []})
+    cursos_set = set(asig['cursos'])
+    asig_set = set(asig['asignaturas'])
+    if cursor:
+        try:
+            cursor.execute("SELECT DISTINCT curso_id, asignatura_id FROM evaluaciones WHERE profesor_id = %s", (p_id,))
+            for row in cursor.fetchall():
+                if row.get('curso_id'):
+                    cursos_set.add(row['curso_id'])
+                if row.get('asignatura_id'):
+                    asig_set.add(row['asignatura_id'])
+        except Exception:
+            pass
+    return {'cursos': list(cursos_set), 'asignaturas': list(asig_set)}
+
+def resolve_profesor_id(user_sess, conn=None):
+    if not user_sess or user_sess.get('rol') != 'profe':
+        return user_sess.get('profesor_id') if user_sess else None
+    if user_sess.get('profesor_id'):
+        return user_sess['profesor_id']
+    should_close = False
+    if conn is None:
+        try:
+            conn = get_db_connection()
+            should_close = True
+        except Exception:
+            return None
+    try:
+        with conn.cursor() as cursor:
+            email = user_sess.get('correo', '').strip().lower()
+            if email:
+                cursor.execute("SELECT id FROM profesores WHERE LOWER(email) = %s LIMIT 1", (email,))
+                p = cursor.fetchone()
+                if p:
+                    user_sess['profesor_id'] = p['id']
+                    if 'user' in session:
+                        session['user']['profesor_id'] = p['id']
+                    try:
+                        cursor.execute("UPDATE usuarios SET profesor_id = %s WHERE id = %s", (p['id'], user_sess.get('id')))
+                        conn.commit()
+                    except Exception:
+                        pass
+                    return p['id']
+            nom = user_sess.get('nombre', '').strip().lower()
+            p_id = None
+            if 'marcela' in nom:
+                p_id = 1
+            elif 'antonio' in nom:
+                p_id = 2
+            elif 'carolina' in nom:
+                p_id = 3
+            elif 'patricio' in nom:
+                p_id = 4
+            elif 'valentina' in nom:
+                p_id = 5
+            elif 'diego' in nom:
+                p_id = 6
+            elif 'apresto' in nom:
+                p_id = 7
+            else:
+                cursor.execute("SELECT id FROM profesores WHERE LOWER(nombre) LIKE %s LIMIT 1", (f"%{nom.split()[0]}%",))
+                p = cursor.fetchone()
+                p_id = p['id'] if p else None
+            if p_id:
+                user_sess['profesor_id'] = p_id
+                if 'user' in session:
+                    session['user']['profesor_id'] = p_id
+                try:
+                    cursor.execute("UPDATE usuarios SET profesor_id = %s WHERE id = %s", (p_id, user_sess.get('id')))
+                    conn.commit()
+                except Exception:
+                    pass
+                return p_id
+    except Exception:
+        pass
+    finally:
+        if should_close:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return user_sess.get('profesor_id')
+
 @app.context_processor
 def inject_context():
     user = session.get('user')
+    if user and user.get('rol') == 'profe' and not user.get('profesor_id'):
+        resolve_profesor_id(user)
     dias = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
     meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
     t = date.today()
@@ -166,6 +290,21 @@ def check_and_update_database_schema(conn):
                     cursor.execute("ALTER TABLE recuperaciones ADD COLUMN exigencia DECIMAL(5,2) NOT NULL DEFAULT 60.00")
             except Exception:
                 pass
+
+            # 6. Vincular usuarios docentes a sus registros en profesores
+            try:
+                cursor.execute("""
+                    UPDATE usuarios u
+                    JOIN profesores p ON LOWER(TRIM(u.correo)) = LOWER(TRIM(p.email))
+                    SET u.profesor_id = p.id
+                    WHERE u.rol = 'profe' AND (u.profesor_id IS NULL OR u.profesor_id = 0)
+                """)
+                cursor.execute("UPDATE usuarios SET profesor_id = 1 WHERE LOWER(correo) LIKE '%marcela%' AND (profesor_id IS NULL OR profesor_id = 0)")
+                cursor.execute("UPDATE usuarios SET profesor_id = 2 WHERE LOWER(correo) LIKE '%antonio%' AND (profesor_id IS NULL OR profesor_id = 0)")
+                cursor.execute("UPDATE usuarios SET profesor_id = 3 WHERE LOWER(correo) LIKE '%carolina%' AND (profesor_id IS NULL OR profesor_id = 0)")
+                conn.commit()
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -199,7 +338,7 @@ def login():
         if not user.get('activo', 1):
             return render_template('login.html', error='Esta cuenta está desactivada por administración.', correo=correo)
 
-        session['user'] = {
+        session_user = {
             'id': user['id'],
             'rut': user['rut'],
             'correo': user['correo'],
@@ -208,6 +347,10 @@ def login():
             'profesor_id': user.get('profesor_id'),
             'alumno_id': user.get('alumno_id')
         }
+        if session_user['rol'] == 'profe' and not session_user['profesor_id']:
+            resolve_profesor_id(session_user)
+
+        session['user'] = session_user
 
         flash(f'¡Bienvenido(a), {user["nombre"]}!', 'success')
         return redirect(url_for('index'))
@@ -347,9 +490,26 @@ def index():
             JOIN asignaturas a ON e.asignatura_id = a.id
             JOIN profesores p ON e.profesor_id = p.id
             JOIN cursos c ON e.curso_id = c.id
-            ORDER BY e.fecha ASC, e.hora ASC
         """
-        cursor.execute(query_evals)
+        params_evals = []
+        user_sess = session.get('user', {})
+        prof_id = resolve_profesor_id(user_sess, conn)
+        mi_profesor = None
+
+        if user_sess.get('rol') == 'profe':
+            if prof_id:
+                query_evals += " WHERE e.profesor_id = %s"
+                params_evals.append(prof_id)
+                cursor.execute("SELECT * FROM profesores WHERE id = %s", (prof_id,))
+                p_row = cursor.fetchone()
+                if p_row:
+                    p_row['nombre_completo'] = f"{p_row['nombre']} {p_row['apellido']}"
+                    mi_profesor = p_row
+            else:
+                query_evals += " WHERE 1 = 0"
+
+        query_evals += " ORDER BY e.fecha ASC, e.hora ASC"
+        cursor.execute(query_evals, params_evals)
         todas_evals = cursor.fetchall()
 
         for ev in todas_evals:
@@ -359,20 +519,25 @@ def index():
             ev['profesor'] = {'nombre_completo': f"{ev['profe_nombre']} {ev['profe_apellido']}"}
             ev['curso'] = {'nombre': ev['curso_nombre']}
 
-        cursor.execute("SELECT COUNT(*) AS total FROM cursos")
-        total_cursos = cursor.fetchone()['total']
-
         cursor.execute("SELECT COUNT(*) AS total FROM alumnos")
         total_alumnos = cursor.fetchone()['total']
 
-        cursor.execute("""
+        query_recs = """
             SELECT r.*, e.titulo AS eval_titulo, a.nombre AS alumno_nombre, a.apellido AS alumno_apellido, c.nombre AS curso_nombre
             FROM recuperaciones r
             JOIN evaluaciones e ON r.evaluacion_id = e.id
             JOIN alumnos a ON r.alumno_id = a.id
             JOIN cursos c ON a.curso_id = c.id
             WHERE r.estado = 'pendiente'
-        """)
+        """
+        params_recs = []
+        if user_sess.get('rol') == 'profe':
+            if prof_id:
+                query_recs += " AND e.profesor_id = %s"
+                params_recs.append(prof_id)
+            else:
+                query_recs += " AND 1 = 0"
+        cursor.execute(query_recs, params_recs)
         recuperaciones_pendientes = cursor.fetchall()
         for r in recuperaciones_pendientes:
             r['fecha_recuperacion'] = format_date_val(r.get('fecha_recuperacion'))
@@ -380,14 +545,32 @@ def index():
             r['alumno'] = {'nombre': r['alumno_nombre'], 'apellido': r['alumno_apellido'], 'nombre_completo': f"{r['alumno_nombre']} {r['alumno_apellido']}"}
             r['curso'] = {'nombre': r['curso_nombre']}
 
-        cursor.execute("""
-            SELECT c.nombre AS curso_nombre, COUNT(e.id) AS count
-            FROM cursos c
-            LEFT JOIN evaluaciones e ON c.id = e.curso_id
-            GROUP BY c.id, c.nombre
-            ORDER BY count DESC
-        """)
-        evals_por_curso = cursor.fetchall()
+        if user_sess.get('rol') == 'profe':
+            if prof_id:
+                cursor.execute("""
+                    SELECT c.nombre AS curso_nombre, COUNT(e.id) AS count
+                    FROM cursos c
+                    JOIN evaluaciones e ON c.id = e.curso_id AND e.profesor_id = %s
+                    GROUP BY c.id, c.nombre
+                    HAVING count > 0
+                    ORDER BY count DESC
+                """, (prof_id,))
+                evals_por_curso = cursor.fetchall()
+                total_cursos = len(evals_por_curso)
+            else:
+                evals_por_curso = []
+                total_cursos = 0
+        else:
+            cursor.execute("""
+                SELECT c.nombre AS curso_nombre, COUNT(e.id) AS count
+                FROM cursos c
+                LEFT JOIN evaluaciones e ON c.id = e.curso_id
+                GROUP BY c.id, c.nombre
+                ORDER BY count DESC
+            """)
+            evals_por_curso = cursor.fetchall()
+            cursor.execute("SELECT COUNT(*) AS total FROM cursos")
+            total_cursos = cursor.fetchone()['total']
 
     conn.close()
 
@@ -403,7 +586,8 @@ def index():
         recuperaciones_pendientes=recuperaciones_pendientes,
         total_cursos=total_cursos,
         total_alumnos=total_alumnos,
-        evals_por_curso=evals_por_curso
+        evals_por_curso=evals_por_curso,
+        mi_profesor=mi_profesor
     )
 
 # -------------------------------------------------------------
@@ -417,12 +601,48 @@ def listar_evaluaciones():
     asignatura_id = request.args.get('asignatura_id', '').strip()
     fecha_desde = request.args.get('fecha_desde', '').strip()
     fecha_hasta = request.args.get('fecha_hasta', '').strip()
+    user_sess = session.get('user', {})
+    prof_id = resolve_profesor_id(user_sess, conn)
 
     with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
-        cursos = cursor.fetchall()
-        cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
-        asignaturas = cursor.fetchall()
+        if user_sess.get('rol') == 'profe':
+            if prof_id:
+                asigs_info = get_profesor_asignaciones(prof_id, cursor)
+                if asigs_info['cursos']:
+                    fmt_c = ','.join(['%s'] * len(asigs_info['cursos']))
+                    cursor.execute(f"SELECT DISTINCT id, nombre, nivel FROM cursos WHERE id IN ({fmt_c}) ORDER BY nombre ASC", tuple(asigs_info['cursos']))
+                    cursos = cursor.fetchall()
+                else:
+                    cursor.execute("""
+                        SELECT DISTINCT c.id, c.nombre, c.nivel
+                        FROM cursos c
+                        JOIN evaluaciones e ON c.id = e.curso_id
+                        WHERE e.profesor_id = %s
+                        ORDER BY c.nombre ASC
+                    """, (prof_id,))
+                    cursos = cursor.fetchall()
+
+                if asigs_info['asignaturas']:
+                    fmt_a = ','.join(['%s'] * len(asigs_info['asignaturas']))
+                    cursor.execute(f"SELECT DISTINCT id, nombre, color FROM asignaturas WHERE id IN ({fmt_a}) ORDER BY nombre ASC", tuple(asigs_info['asignaturas']))
+                    asignaturas = cursor.fetchall()
+                else:
+                    cursor.execute("""
+                        SELECT DISTINCT a.id, a.nombre, a.color
+                        FROM asignaturas a
+                        JOIN evaluaciones e ON a.id = e.asignatura_id
+                        WHERE e.profesor_id = %s
+                        ORDER BY a.nombre ASC
+                    """, (prof_id,))
+                    asignaturas = cursor.fetchall()
+            else:
+                cursos = []
+                asignaturas = []
+        else:
+            cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+            cursos = cursor.fetchall()
+            cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
+            asignaturas = cursor.fetchall()
 
         query = """
             SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color,
@@ -434,6 +654,12 @@ def listar_evaluaciones():
             WHERE 1=1
         """
         params = []
+        if user_sess.get('rol') == 'profe':
+            if prof_id:
+                query += " AND e.profesor_id = %s"
+                params.append(prof_id)
+            else:
+                query += " AND 1=0"
         if curso_id:
             query += " AND e.curso_id = %s"
             params.append(curso_id)
@@ -452,7 +678,7 @@ def listar_evaluaciones():
         evaluaciones = cursor.fetchall()
 
         # Si el usuario es Inspectoría, filtrar únicamente evaluaciones con inasistencias registradas
-        if session['user']['rol'] == 'inspe':
+        if user_sess.get('rol') == 'inspe':
             cursor.execute("""
                 SELECT DISTINCT evaluacion_id 
                 FROM asistencia_evaluaciones 
@@ -469,9 +695,10 @@ def listar_evaluaciones():
             ev['curso'] = {'nombre': ev['curso_nombre']}
 
     conn.close()
+    page_title = 'Mis Evaluaciones Asignadas' if user_sess.get('rol') == 'profe' else ('Evaluaciones con Inasistencias' if user_sess.get('rol') == 'inspe' else 'Gestión de Evaluaciones')
     return render_template(
         'evaluaciones/listar.html',
-        title='Evaluaciones con Inasistencias' if session['user']['rol'] == 'inspe' else 'Gestión de Evaluaciones',
+        title=page_title,
         active='evaluaciones',
         evaluaciones=evaluaciones,
         cursos=cursos,
@@ -498,17 +725,10 @@ def crear_evaluacion():
         hora = request.form.get('hora', '').strip() or None
         asignatura_id = request.form.get('asignatura_id')
         curso_id = request.form.get('curso_id')
-        profesor_id = session['user'].get('profesor_id')
+        profesor_id = resolve_profesor_id(session['user'], conn)
 
         with conn.cursor() as cursor:
-            # Validar profesor_id existente o tomar el primero
-            if profesor_id:
-                cursor.execute("SELECT id FROM profesores WHERE id = %s", (profesor_id,))
-                if not cursor.fetchone():
-                    cursor.execute("SELECT id FROM profesores LIMIT 1")
-                    first_p = cursor.fetchone()
-                    profesor_id = first_p['id'] if first_p else 1
-            else:
+            if not profesor_id:
                 cursor.execute("SELECT id FROM profesores LIMIT 1")
                 first_p = cursor.fetchone()
                 profesor_id = first_p['id'] if first_p else 1
@@ -539,19 +759,42 @@ def crear_evaluacion():
 
     hoy = date.today().strftime('%Y-%m-%d')
     mi_profesor = None
+    prof_id = resolve_profesor_id(session['user'], conn)
     with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
-        cursos = cursor.fetchall()
-        cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
-        asignaturas = cursor.fetchall()
+        if session['user']['rol'] == 'profe' and prof_id:
+            asigs_info = get_profesor_asignaciones(prof_id, cursor)
+            if asigs_info['cursos']:
+                fmt_c = ','.join(['%s'] * len(asigs_info['cursos']))
+                cursor.execute(f"SELECT * FROM cursos WHERE id IN ({fmt_c}) ORDER BY nombre ASC", tuple(asigs_info['cursos']))
+                cursos = cursor.fetchall()
+            else:
+                cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+                cursos = cursor.fetchall()
 
-        prof_id = session['user'].get('profesor_id')
-        if prof_id:
+            if asigs_info['asignaturas']:
+                fmt_a = ','.join(['%s'] * len(asigs_info['asignaturas']))
+                cursor.execute(f"SELECT * FROM asignaturas WHERE id IN ({fmt_a}) ORDER BY nombre ASC", tuple(asigs_info['asignaturas']))
+                asignaturas = cursor.fetchall()
+            else:
+                cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
+                asignaturas = cursor.fetchall()
+
             cursor.execute("SELECT * FROM profesores WHERE id = %s", (prof_id,))
             p = cursor.fetchone()
             if p:
                 p['nombre_completo'] = f"{p['nombre']} {p['apellido']}"
                 mi_profesor = p
+        else:
+            cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+            cursos = cursor.fetchall()
+            cursor.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
+            asignaturas = cursor.fetchall()
+            if prof_id:
+                cursor.execute("SELECT * FROM profesores WHERE id = %s", (prof_id,))
+                p = cursor.fetchone()
+                if p:
+                    p['nombre_completo'] = f"{p['nombre']} {p['apellido']}"
+                    mi_profesor = p
     conn.close()
 
     if not mi_profesor:
@@ -1046,6 +1289,22 @@ def crear_recuperacion():
 def completar_recuperacion(recup_id):
     conn = get_db_connection()
     with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT r.*, e.profesor_id
+            FROM recuperaciones r
+            JOIN evaluaciones e ON r.evaluacion_id = e.id
+            WHERE r.id = %s
+        """, (recup_id,))
+        rec = cursor.fetchone()
+        if not rec:
+            conn.close()
+            flash('Recuperación no encontrada.', 'danger')
+            return redirect(url_for('listar_recuperaciones'))
+        prof_id = resolve_profesor_id(session['user'], conn)
+        if session['user']['rol'] == 'profe' and str(rec.get('profesor_id')) != str(prof_id):
+            conn.close()
+            flash('Acceso denegado: Solo el docente titular de la asignatura puede calificar o completar esta recuperación.', 'danger')
+            return redirect(url_for('listar_recuperaciones'))
         cursor.execute("UPDATE recuperaciones SET estado = 'completada' WHERE id = %s", (recup_id,))
         conn.commit()
     conn.close()
@@ -1058,6 +1317,22 @@ def completar_recuperacion(recup_id):
 def cancelar_recuperacion(recup_id):
     conn = get_db_connection()
     with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT r.*, e.profesor_id
+            FROM recuperaciones r
+            JOIN evaluaciones e ON r.evaluacion_id = e.id
+            WHERE r.id = %s
+        """, (recup_id,))
+        rec = cursor.fetchone()
+        if not rec:
+            conn.close()
+            flash('Recuperación no encontrada.', 'danger')
+            return redirect(url_for('listar_recuperaciones'))
+        prof_id = resolve_profesor_id(session['user'], conn)
+        if session['user']['rol'] == 'profe' and str(rec.get('profesor_id')) != str(prof_id):
+            conn.close()
+            flash('Acceso denegado: Solo el docente titular de la asignatura puede cancelar esta recuperación.', 'danger')
+            return redirect(url_for('listar_recuperaciones'))
         cursor.execute("UPDATE recuperaciones SET estado = 'cancelada' WHERE id = %s", (recup_id,))
         conn.commit()
     conn.close()
@@ -1072,6 +1347,22 @@ def cambiar_estado_recuperacion(recup_id):
     if nuevo_estado in ['pendiente', 'completada', 'rendida', 'cancelada']:
         conn = get_db_connection()
         with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT r.*, e.profesor_id
+                FROM recuperaciones r
+                JOIN evaluaciones e ON r.evaluacion_id = e.id
+                WHERE r.id = %s
+            """, (recup_id,))
+            rec = cursor.fetchone()
+            if not rec:
+                conn.close()
+                flash('Recuperación no encontrada.', 'danger')
+                return redirect(url_for('listar_recuperaciones'))
+            prof_id = resolve_profesor_id(session['user'], conn)
+            if session['user']['rol'] == 'profe' and str(rec.get('profesor_id')) != str(prof_id):
+                conn.close()
+                flash('Acceso denegado: Solo el docente titular de la asignatura puede modificar el estado de esta recuperación.', 'danger')
+                return redirect(url_for('listar_recuperaciones'))
             cursor.execute("UPDATE recuperaciones SET estado = %s WHERE id = %s", (nuevo_estado, recup_id))
             conn.commit()
         conn.close()
