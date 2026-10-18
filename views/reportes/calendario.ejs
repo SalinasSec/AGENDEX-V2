@@ -40,8 +40,19 @@
             </div>
             <a href="/reportes/calendario" class="btn btn-sm btn-outline-primary"><i class="bi bi-calendar-event me-1"></i>Hoy</a>
         </div>
-    </div>
 </div>
+
+<% if (current_user.rol === 'profe') { %>
+<div class="alert alert-info bg-light-subtle border-info-subtle py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 shadow-xs">
+    <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+        <span class="small">
+            <strong>Tus Cursos Asignados (<%= cursos.map(c => c.nombre).join(' y ') %>):</strong> Estás viendo únicamente evaluaciones de los cursos donde impartes clases. Puedes consultar pruebas calendarizadas por docentes colegas en estos mismos cursos para coordinar fechas y cupos. Al hacer clic en pruebas de otros docentes entrarás en <em>Modo Solo Consulta</em>.
+        </span>
+    </div>
+    <span class="badge bg-primary text-white"><%= cursos.map(c => c.nombre).join(' & ') %></span>
+</div>
+<% } %>
 
 <!-- Filtros de Navegación Rápida -->
 <div class="card shadow-sm border-0 mb-4">
@@ -64,22 +75,16 @@
             <div class="col-12 col-sm-auto">
                 <label class="form-label small mb-1 fw-semibold">Filtrar por Curso</label>
                 <select name="curso_id" class="form-select form-select-sm">
-                    <option value="">Todos los cursos</option>
-                    <% if (typeof mis_cursos_ids !== 'undefined' && mis_cursos_ids && mis_cursos_ids.length > 0) { %>
-                    <optgroup label="Mis Cursos Asignados">
-                        <% cursos.filter(c => mis_cursos_ids.includes(c.id)).forEach(c => { %>
-                        <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>>★ <%= c.nombre %> (<%= c.nivel %>)</option>
-                        <% }) %>
-                    </optgroup>
-                    <optgroup label="Otros Cursos">
-                        <% cursos.filter(c => !mis_cursos_ids.includes(c.id)).forEach(c => { %>
-                        <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
-                        <% }) %>
-                    </optgroup>
+                    <% if (current_user.rol === 'profe') { %>
+                    <option value="">Todos mis cursos (<%= cursos.map(c => c.nombre).join(', ') %>)</option>
+                    <% cursos.forEach(c => { %>
+                    <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>>★ <%= c.nombre %> (<%= c.nivel %>)</option>
+                    <% }) %>
                     <% } else { %>
-                        <% cursos.forEach(c => { %>
-                        <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
-                        <% }) %>
+                    <option value="">Todos los cursos</option>
+                    <% cursos.forEach(c => { %>
+                    <option value="<%= c.id %>" <%= filtros.curso_id == c.id ? 'selected' : '' %>><%= c.nombre %> (<%= c.nivel %>)</option>
+                    <% }) %>
                     <% } %>
                 </select>
             </div>
@@ -212,14 +217,19 @@
                                                 </div>
                                                 <% if (ev.es_mia) { %>
                                                 <span class="badge bg-warning text-dark py-0 px-1" style="font-size: 0.60rem;">Tú</span>
+                                                <% } else if (current_user.rol === 'profe') { %>
+                                                <span class="badge bg-light text-dark py-0 px-1 border" style="font-size: 0.60rem;" title="Docente colega de curso (Solo consulta)"><i class="bi bi-eye"></i> Colega</span>
                                                 <% } %>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center opacity-90" style="font-size: 0.68rem;">
-                                                <span class="text-truncate"><%= ev.curso ? ev.curso.nombre : '' %></span>
+                                                <span class="text-truncate fw-bold"><%= ev.curso ? ev.curso.nombre : '' %></span>
                                                 <span><%= ev.hora || '' %></span>
                                             </div>
                                             <div class="opacity-90 text-truncate" style="font-size: 0.67rem; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 1px; margin-top: 1px;">
                                                 <i class="bi bi-person me-1"></i><%= ev.profesor ? ev.profesor.nombre_completo : 'Docente' %>
+                                                <% if (!ev.es_mia && current_user.rol === 'profe') { %>
+                                                <span class="small opacity-75">(Solo lectura)</span>
+                                                <% } %>
                                             </div>
                                         </a>
                                         <% }) %>
@@ -316,8 +326,13 @@
                                         <span class="badge bg-light text-dark border"><%= ev.hora || 'Horario clase' %></span>
                                     </div>
                                     <div class="fw-bold text-dark"><%= ev.titulo %></div>
-                                    <div class="small text-muted">
-                                        <strong><%= ev.curso ? ev.curso.nombre : '' %></strong> &bull; Prof. <%= ev.profesor ? ev.profesor.nombre_completo : '' %>
+                                    <div class="small text-muted d-flex justify-content-between align-items-center mt-1">
+                                        <span><strong><%= ev.curso ? ev.curso.nombre : '' %></strong> &bull; Prof. <%= ev.profesor ? ev.profesor.nombre_completo : '' %></span>
+                                        <% if (ev.es_mia) { %>
+                                        <span class="badge bg-warning text-dark py-0 px-2" style="font-size: 0.65rem;">Tú</span>
+                                        <% } else if (current_user.rol === 'profe') { %>
+                                        <span class="badge bg-light text-secondary border py-0 px-2" style="font-size: 0.65rem;"><i class="bi bi-eye me-1"></i>Solo Consulta</span>
+                                        <% } %>
                                     </div>
                                 </a>
                                 <% }) %>

@@ -832,6 +832,17 @@ def detalle_evaluacion(eval_id):
             flash('Evaluación no encontrada.', 'danger')
             return redirect(url_for('listar_evaluaciones'))
 
+        # Restricción de acceso para profesores: solo pueden ver evaluaciones de sus cursos asignados
+        user_sess = session.get('user', {})
+        if user_sess.get('rol') == 'profe':
+            prof_id = resolve_profesor_id(user_sess, conn)
+            asigs_info = get_profesor_asignaciones(prof_id, cursor)
+            mis_cursos = asigs_info.get('cursos', [])
+            if mis_cursos and ev['curso_id'] not in mis_cursos:
+                conn.close()
+                flash('Acceso denegado: Esta evaluación corresponde a un curso donde no impartes clases.', 'danger')
+                return redirect(url_for('reporte_calendario'))
+
         ev['fecha'] = format_date_val(ev.get('fecha'))
         ev['hora'] = format_time_val(ev.get('hora'))
         ev['asignatura'] = {'nombre': ev.get('asignatura_nombre') or 'General', 'color': ev.get('asignatura_color') or '#14213D'}
@@ -1581,9 +1592,26 @@ def reporte_calendario():
     meses_list = [{'num': i + 1, 'nombre': m} for i, m in enumerate(meses_nombres)]
 
     conn = get_db_connection()
+    check_and_update_database_schema(conn)
+
+    prof_id = resolve_profesor_id(user, conn)
+    mis_cursos_ids = []
+
     with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
-        cursos = cursor.fetchall()
+        if user.get('rol') == 'profe' and prof_id:
+            asigs_info = get_profesor_asignaciones(prof_id, cursor)
+            mis_cursos_ids = asigs_info.get('cursos', [])
+            if mis_cursos_ids:
+                fmt_c = ','.join(['%s'] * len(mis_cursos_ids))
+                cursor.execute(f"SELECT * FROM cursos WHERE id IN ({fmt_c}) ORDER BY nombre ASC", tuple(mis_cursos_ids))
+                cursos = cursor.fetchall()
+                if curso_id and curso_id not in mis_cursos_ids:
+                    curso_id = None
+            else:
+                cursos = []
+        else:
+            cursor.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+            cursos = cursor.fetchall()
 
         query = """
             SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color, c.nombre AS curso_nombre
@@ -1593,9 +1621,22 @@ def reporte_calendario():
             WHERE YEAR(e.fecha) = %s AND MONTH(e.fecha) = %s
         """
         params = [anio, mes]
-        if curso_id:
+
+        if user.get('rol') == 'profe':
+            if mis_cursos_ids:
+                if curso_id:
+                    query += " AND e.curso_id = %s"
+                    params.append(curso_id)
+                else:
+                    fmt_c = ','.join(['%s'] * len(mis_cursos_ids))
+                    query += f" AND e.curso_id IN ({fmt_c})"
+                    params.extend(mis_cursos_ids)
+            else:
+                query += " AND 1 = 0"
+        elif curso_id:
             query += " AND e.curso_id = %s"
             params.append(curso_id)
+
         query += " ORDER BY e.fecha ASC, e.hora ASC"
         cursor.execute(query, params)
         evals = cursor.fetchall()

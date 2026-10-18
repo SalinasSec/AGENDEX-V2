@@ -627,6 +627,18 @@ app.get('/evaluaciones/:id', requireAuth, (req, res) => {
     return res.redirect('/evaluaciones');
   }
 
+  // Regla de visibilidad y acceso para profesores:
+  // Solo pueden acceder a evaluaciones de los cursos que efectivamente imparten (e.g. 3°G y 4°G para Marcela/Antonio)
+  const user = req.session.user;
+  if (user.rol === 'profe' && user.profesor_id) {
+    const profObj = store.getProfesor(user.profesor_id);
+    const misCursosIds = (profObj && profObj.cursos_asignados) ? profObj.cursos_asignados : [];
+    if (misCursosIds.length > 0 && !misCursosIds.includes(ev.curso_id)) {
+      req.flash('danger', 'Acceso denegado: Esta evaluación corresponde a un curso donde no impartes clases.');
+      return res.redirect('/reportes/calendario');
+    }
+  }
+
   const alumnos = store.getAlumnosByCurso(ev.curso_id);
   const asistenciasMap = {};
   const asistList = store.getAsistenciasByEvaluacion(ev.id);
@@ -922,6 +934,17 @@ app.get('/alumnos/:id', requireAuth, (req, res) => {
     return res.redirect('/alumnos');
   }
 
+  // Si el usuario es profesor, no debe acceder a fichas de alumnos de cursos a los que no hace clases
+  const user = req.session.user;
+  if (user.rol === 'profe' && user.profesor_id) {
+    const profObj = store.getProfesor(user.profesor_id);
+    const misCursosIds = (profObj && profObj.cursos_asignados) ? profObj.cursos_asignados : [];
+    if (misCursosIds.length > 0 && !misCursosIds.includes(alumno.curso_id)) {
+      req.flash('danger', 'Acceso denegado: Este alumno pertenece a un curso donde no impartes clases.');
+      return res.redirect('/alumnos');
+    }
+  }
+
   const evalsCurso = store.evaluaciones.filter(e => e.curso_id === alumno.curso_id);
   const asistenciasList = store.getAsistenciasByAlumno(alumno.id);
   
@@ -1201,17 +1224,35 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
 
   const mesesList = mesesNombres.map((m, i) => ({ num: i + 1, nombre: m }));
 
-  // Lista completa de cursos y profesores
-  const cursosCalendario = store.cursos;
-  const profesoresList = store.profesores.map(p => ({
+  const profObj = (req.session.user.rol === 'profe' && req.session.user.profesor_id) ? store.getProfesor(req.session.user.profesor_id) : null;
+  const currentProfId = profObj ? profObj.id : null;
+  const misCursosIds = profObj && profObj.cursos_asignados ? profObj.cursos_asignados : [];
+
+  // Lista de cursos disponibles en el calendario:
+  // Si el usuario es profesor, ÚNICAMENTE ve y filtra sobre sus cursos asignados (e.g. 3°G y 4°G)
+  let cursosCalendario = store.cursos;
+  if (req.session.user.rol === 'profe' && misCursosIds.length > 0) {
+    cursosCalendario = store.cursos.filter(c => misCursosIds.includes(c.id));
+    if (curso_id && !misCursosIds.includes(curso_id)) {
+      curso_id = null; // No permitir consultar cursos ajenos por query string
+    }
+  }
+
+  // Lista de profesores para filtrar en el calendario:
+  // Para un profesor, solo listar colegas que también hacen clases en sus cursos asignados
+  let profesoresList = store.profesores;
+  if (req.session.user.rol === 'profe' && misCursosIds.length > 0) {
+    profesoresList = store.profesores.filter(p => {
+      if (p.id === currentProfId) return true;
+      if (p.cursos_asignados && p.cursos_asignados.some(cid => misCursosIds.includes(cid))) return true;
+      return false;
+    });
+  }
+  const profesoresSelect = profesoresList.map(p => ({
     id: p.id,
     nombre: p.nombre_completo,
     materia: p.materia
   }));
-
-  const profObj = (req.session.user.rol === 'profe' && req.session.user.profesor_id) ? store.getProfesor(req.session.user.profesor_id) : null;
-  const currentProfId = profObj ? profObj.id : null;
-  const misCursosIds = profObj && profObj.cursos_asignados ? profObj.cursos_asignados : [];
 
   // Filtros adicionales: profesor específico o switch "Sólo mis pruebas"
   let profesor_id = req.query.profesor_id ? Number(req.query.profesor_id) : null;
@@ -1229,12 +1270,23 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
     };
   });
 
-  // Filtrar evaluaciones del mes y año (visibles todas las de Marcela, Antonio, etc. para el curso)
+  // Filtrar evaluaciones del mes y año:
+  // REGLA FUNDAMENTAL:
+  // Los profesores SOLAMENTE pueden ver las pruebas de los cursos que hacen (misCursosIds).
+  // Por ejemplo, Marcela sólo hace a 3°G y 4°G -> Solo ve pruebas de 3°G y 4°G.
+  // Jamás ve pruebas de 1° o 2° medio (como aprestos técnicos u otras).
+  // Si en 3°G o 4°G otro docente (como Antonio) puso una prueba, se muestra para coordinar fechas sin topes.
   let evals = todasEvals.filter(e => {
     if (!e.fecha) return false;
     const parts = e.fecha.split('-');
     const matchYearMonth = parseInt(parts[0], 10) === anio && parseInt(parts[1], 10) === mes;
     if (!matchYearMonth) return false;
+
+    // Restricción por rol de profesor:
+    if (req.session.user.rol === 'profe' && misCursosIds.length > 0) {
+      if (!misCursosIds.includes(e.curso_id)) return false;
+    }
+
     if (curso_id && e.curso_id !== curso_id) return false;
     if (profesor_id && e.profesor_id !== profesor_id) return false;
     return true;
@@ -1255,8 +1307,15 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
     const parts = r.fecha_recuperacion.split('-');
     const matchYearMonth = parseInt(parts[0], 10) === anio && parseInt(parts[1], 10) === mes;
     if (!matchYearMonth) return false;
+
+    const evalCursoId = r.evaluacion ? r.evaluacion.curso_id : (r.alumno ? r.alumno.curso_id : null);
+
+    // Restricción por rol profesor: solo recuperaciones de sus cursos
+    if (req.session.user.rol === 'profe' && misCursosIds.length > 0) {
+      if (evalCursoId && !misCursosIds.includes(evalCursoId)) return false;
+    }
+
     if (curso_id) {
-      const evalCursoId = r.evaluacion ? r.evaluacion.curso_id : (r.alumno ? r.alumno.curso_id : null);
       if (evalCursoId !== curso_id) return false;
     }
     if (profesor_id) {
@@ -1323,7 +1382,7 @@ app.get('/reportes/calendario', requireAuth, (req, res) => {
     total_evals_mes: evals.length,
     total_recups_mes: recups.length,
     cursos: cursosCalendario,
-    profesores: profesoresList,
+    profesores: profesoresSelect,
     filtros: { curso_id, profesor_id, solo_mis_pruebas },
     mis_cursos_ids: misCursosIds,
     es_profe: req.session.user.rol === 'profe',
@@ -1374,14 +1433,11 @@ app.get('/reportes/carga', requireAuth, (req, res) => {
     nombre
   }));
 
-  // Carga global del curso: Para que la carga académica tenga sentido real y pedagógico,
-  // se deben contabilizar TODAS las evaluaciones que tienen los estudiantes de ese curso
-  // programadas por TODOS los profesores en el período.
   let cursosCarga = store.cursos;
   const evalsBase = store.evaluaciones;
 
-  // Si el usuario es profesor, opcionalmente puede alternar entre ver todos o sólo sus cursos asignados
-  const soloMisCursos = req.query.mis_cursos === '1';
+  // Si el usuario es profesor, por defecto solo ve la carga de sus cursos asignados
+  const soloMisCursos = req.query.mis_cursos !== '0';
   let profObj = null;
   if (req.session.user.rol === 'profe' && req.session.user.profesor_id) {
     profObj = store.getProfesor(req.session.user.profesor_id);

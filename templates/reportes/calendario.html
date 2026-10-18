@@ -15,6 +15,13 @@
     </div>
 </div>
 
+{% if current_user.rol == 'profe' %}
+<div class="alert alert-info py-2 px-3 mb-3 d-flex align-items-center gap-2 small">
+    <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+    <span><strong>Cursos asignados:</strong> Mostrando únicamente evaluaciones de tus cursos asignados. Las pruebas de colegas en tus cursos se visualizan para coordinación y están protegidas en modo solo lectura.</span>
+</div>
+{% endif %}
+
 <div class="card mb-4">
     <div class="card-body py-3">
         <form method="GET" action="/reportes/calendario" class="row g-2 align-items-center">
@@ -34,7 +41,11 @@
             <div class="col-auto">
                 <label class="form-label small mb-0">Curso</label>
                 <select name="curso_id" class="form-select form-select-sm">
+                    {% if current_user.rol == 'profe' %}
+                    <option value="">Todos mis cursos</option>
+                    {% else %}
                     <option value="">Todos</option>
+                    {% endif %}
                     {% for c in cursos %}
                     <option value="{{ c.id }}" {% if filtros.curso_id == c.id|string or filtros.curso_id == c.id %}selected{% endif %}>{{ c.nombre }}</option>
                     {% endfor %}
