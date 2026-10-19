@@ -338,6 +338,8 @@ app.all('/auth/logout', handleLogout);
 // -------------------------------------------------------------
 // DASHBOARD (INICIO)
 // -------------------------------------------------------------
+app.get('/dashboard', requireAuth, (req, res) => res.redirect('/'));
+
 app.get('/', requireAuth, (req, res) => {
   const user = req.session.user;
   const hoy = new Date().toISOString().split('T')[0];

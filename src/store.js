@@ -286,6 +286,7 @@ class Store {
         asignatura_id: 7, // M8 Desarrollo de Aplicaciones Web
         curso_id: 26, // 4G (Prof. Jefe Marcela Rubio)
         profesor_id: 1, // Marcela Rubio
+        asistencia_guardada: true,
         created_at: new Date()
       },
       {
@@ -297,6 +298,7 @@ class Store {
         asignatura_id: 8, // M5 DBD
         curso_id: 19, // 3G (Prof. Jefe Antonio Velásquez)
         profesor_id: 2, // Antonio Velásquez
+        asistencia_guardada: true,
         created_at: new Date()
       },
       {
@@ -580,12 +582,14 @@ class Store {
     const existingIdx = this.asistencias.findIndex(a => a.alumno_id === aId && a.evaluacion_id === eId);
 
     // Derive estado_asistencia if not provided
-    let estado = estado_asistencia;
+    let estado = Array.isArray(estado_asistencia) ? estado_asistencia[0] : estado_asistencia;
+    if (typeof estado === 'string') estado = estado.trim();
     if (!estado) {
       if (presente) estado = 'presente';
       else if (justificado) estado = 'justificado';
       else estado = 'injustificada';
     }
+    const cleanMotivo = Array.isArray(motivo) ? (motivo[0] || '') : (motivo || '');
 
     const isPresente = estado === 'presente';
     const isJustificado = (estado === 'justificado' || estado === 'salida');
@@ -595,7 +599,7 @@ class Store {
         ...this.asistencias[existingIdx],
         presente: isPresente,
         estado_asistencia: estado,
-        motivo: isPresente ? '' : (motivo || ''),
+        motivo: isPresente ? '' : cleanMotivo,
         justificado: isPresente ? false : isJustificado
       };
       return this.asistencias[existingIdx];
@@ -606,7 +610,7 @@ class Store {
         evaluacion_id: eId,
         presente: isPresente,
         estado_asistencia: estado,
-        motivo: isPresente ? '' : (motivo || ''),
+        motivo: isPresente ? '' : cleanMotivo,
         justificado: isPresente ? false : isJustificado
       };
       this.asistencias.push(nueva);
