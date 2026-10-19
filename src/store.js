@@ -290,7 +290,7 @@ class Store {
       },
       {
         id: 2,
-        titulo: "Prueba Consultas SQL y Normalización Relacional",
+        titulo: "Prueba Consultas SQL y Normalización",
         fecha: todayStr,
         hora: "10:15",
         descripcion: "Consultas multi-tabla JOIN, agrupamientos y subconsultas en MySQL/PostgreSQL.",
