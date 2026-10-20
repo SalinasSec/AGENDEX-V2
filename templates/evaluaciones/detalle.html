@@ -333,8 +333,8 @@
                             </thead>
                             <tbody>
                                 {% for alumno in alumnos %}
-                                {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
-                                {% set estado_actual = asist.estado_asistencia if asist and asist.estado_asistencia else 'presente' %}
+                                {% set asist = (asistencias.get(alumno.id) or asistencias.get(alumno.id|string)) if (asistencias and asistencias is mapping) else None %}
+                                {% set estado_actual = asist.estado_asistencia if (asist and asist.estado_asistencia) else ('presente' if (asist and (asist.presente == 1 or asist.presente == True or asist.presente == '1')) else ('salida' if (asist and (asist.justificado == 1 or asist.justificado == True) and 'salida' in (asist.motivo|string|lower)) else ('justificado' if (asist and (asist.justificado == 1 or asist.justificado == True)) else ('injustificada' if (asist and (asist.presente == 0 or asist.presente == False or asist.presente == '0')) else 'presente')))) %}
                                 <tr>
                                     <td>
                                         <div class="fw-semibold">{{ alumno.nombre_completo }}</div>
@@ -394,8 +394,8 @@
                                 </thead>
                                 <tbody>
                                     {% for alumno in alumnos %}
-                                    {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
-                                    {% set estado_actual = asist.estado_asistencia if asist and asist.estado_asistencia else 'presente' %}
+                                    {% set asist = (asistencias.get(alumno.id) or asistencias.get(alumno.id|string)) if (asistencias and asistencias is mapping) else None %}
+                                    {% set estado_actual = asist.estado_asistencia if (asist and asist.estado_asistencia) else ('presente' if (asist and (asist.presente == 1 or asist.presente == True or asist.presente == '1')) else ('salida' if (asist and (asist.justificado == 1 or asist.justificado == True) and 'salida' in (asist.motivo|string|lower)) else ('justificado' if (asist and (asist.justificado == 1 or asist.justificado == True)) else ('injustificada' if (asist and (asist.presente == 0 or asist.presente == False or asist.presente == '0')) else 'presente')))) %}
                                     <tr>
                                         <td>
                                             <div class="fw-semibold">{{ alumno.nombre_completo }}</div>
@@ -459,8 +459,8 @@
                             </thead>
                             <tbody>
                                 {% for alumno in alumnos %}
-                                {% set asist = asistencias.get(alumno.id) if (asistencias and asistencias is mapping) else None %}
-                                {% set estado_actual = asist.estado_asistencia if asist and asist.estado_asistencia else 'presente' %}
+                                {% set asist = (asistencias.get(alumno.id) or asistencias.get(alumno.id|string)) if (asistencias and asistencias is mapping) else None %}
+                                {% set estado_actual = asist.estado_asistencia if (asist and asist.estado_asistencia) else ('presente' if (asist and (asist.presente == 1 or asist.presente == True or asist.presente == '1')) else ('salida' if (asist and (asist.justificado == 1 or asist.justificado == True) and 'salida' in (asist.motivo|string|lower)) else ('justificado' if (asist and (asist.justificado == 1 or asist.justificado == True)) else ('injustificada' if (asist and (asist.presente == 0 or asist.presente == False or asist.presente == '0')) else 'presente')))) %}
                                 <tr>
                                     <td><strong>{{ alumno.nombre_completo }}</strong></td>
                                     <td class="text-muted small">{{ alumno.rut }}</td>

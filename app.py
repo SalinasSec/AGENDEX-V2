@@ -39,6 +39,30 @@ PROFESORES_ASIGNACIONES = {
 # -------------------------------------------------------------
 # HELPERS Y FORMATEADORES
 # -------------------------------------------------------------
+_schema_ensured = False
+def ensure_schema_asistencia(conn):
+    global _schema_ensured
+    if _schema_ensured:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*) AS cnt 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                  AND TABLE_NAME = 'asistencia_evaluaciones' 
+                  AND COLUMN_NAME = 'estado_asistencia'
+            """)
+            r = cur.fetchone()
+            if r and r.get('cnt') == 0:
+                cur.execute("""
+                    ALTER TABLE asistencia_evaluaciones 
+                    ADD COLUMN estado_asistencia ENUM('presente', 'injustificada', 'justificado', 'salida') DEFAULT 'presente' 
+                    AFTER alumno_id
+                """)
+        _schema_ensured = True
+    except Exception:
+        _schema_ensured = True
 def format_date(val):
     if not val:
         return ''
@@ -455,6 +479,7 @@ def crear_evaluacion():
 @login_required
 def detalle_evaluacion(eval_id):
     conn = get_db_connection()
+    ensure_schema_asistencia(conn)
     with conn.cursor() as cur:
         cur.execute("""
             SELECT e.*, a.nombre AS asignatura_nombre, a.color AS asignatura_color,
@@ -466,7 +491,6 @@ def detalle_evaluacion(eval_id):
             WHERE e.id = %s
         """, (eval_id,))
         ev = enrich_eval(cur.fetchone())
-
         if not ev:
             conn.close()
             flash('Evaluación no encontrada.', 'danger')
@@ -483,7 +507,38 @@ def detalle_evaluacion(eval_id):
         # Asistencias registradas
         cur.execute("SELECT * FROM asistencia_evaluaciones WHERE evaluacion_id = %s", (eval_id,))
         asist_list = cur.fetchall()
-        asistencias = {a['alumno_id']: a for a in asist_list}
+        asistencias = {}
+        for a in asist_list:
+            if not a.get('motivo'):
+                a['motivo'] = a.get('motivo_inasistencia', '')
+            if not a.get('estado_asistencia'):
+                if a.get('presente') in (1, True, '1'):
+                    a['estado_asistencia'] = 'presente'
+                elif a.get('justificado') in (1, True, '1'):
+                    mot_low = (a.get('motivo') or '').lower()
+                    if 'salida' in mot_low:
+                        a['estado_asistencia'] = 'salida'
+                    else:
+                        a['estado_asistencia'] = 'justificado'
+                else:
+                    a['estado_asistencia'] = 'injustificada'
+            asistencias[a['alumno_id']] = a
+            asistencias[str(a['alumno_id'])] = a
+            try:
+                asistencias[int(a['alumno_id'])] = a
+            except (ValueError, TypeError):
+                pass
+
+        # Alumnos en condición de inasistencia (para Inspectoría)
+        alumnos_afectados = []
+        for al in alumnos:
+            asist = asistencias.get(al['id']) or asistencias.get(str(al['id']))
+            if asist:
+                st = asist.get('estado_asistencia')
+                if st and st != 'presente':
+                    alumnos_afectados.append(al)
+                elif not asist.get('presente'):
+                    alumnos_afectados.append(al)
 
     conn.close()
     return render_template(
@@ -492,7 +547,8 @@ def detalle_evaluacion(eval_id):
         active='evaluaciones',
         ev=ev,
         alumnos=alumnos,
-        asistencias=asistencias
+        asistencias=asistencias,
+        alumnos_afectados=alumnos_afectados
     )
 
 @app.route('/evaluaciones/<int:eval_id>/asistencia', methods=['POST'])
@@ -500,6 +556,7 @@ def detalle_evaluacion(eval_id):
 @role_required('profe', 'inspe', 'utp')
 def asistencia_evaluacion(eval_id):
     conn = get_db_connection()
+    ensure_schema_asistencia(conn)
     user = session['user']
 
     with conn.cursor() as cur:
@@ -510,52 +567,101 @@ def asistencia_evaluacion(eval_id):
             flash('Evaluación no encontrada.', 'danger')
             return redirect(url_for('evaluaciones'))
 
+        # Obtener los IDs de alumnos del curso y también cualquier alumno enviado por el formulario
         cur.execute("SELECT id FROM alumnos WHERE curso_id = %s", (ev['curso_id'],))
         alumnos_ids = [a['id'] for a in cur.fetchall()]
+        for k in request.form.keys():
+            if k.startswith('estado_'):
+                try:
+                    aid = int(k.replace('estado_', ''))
+                    if aid not in alumnos_ids:
+                        alumnos_ids.append(aid)
+                except ValueError:
+                    pass
 
         for a_id in alumnos_ids:
+            # Aceptar tanto 'estado_X' (nombre usado en las plantillas) como 'asist_X'
+            estado = (request.form.get(f'estado_{a_id}') or request.form.get(f'asist_{a_id}') or '').strip()
+            motivo = request.form.get(f'motivo_{a_id}', '').strip()
+
             if user['rol'] == 'inspe':
-                estado = request.form.get(f'estado_{a_id}')
-                motivo = request.form.get(f'motivo_{a_id}', '').strip()
-                if estado:
-                    presente = 1 if estado == 'presente' else 0
-                    justificado = 1 if estado in ['justificado', 'salida'] else 0
+                if not estado:
+                    continue
+                presente = 1 if estado == 'presente' else 0
+                justificado = 1 if estado in ['justificado', 'salida'] else 0
+                try:
                     cur.execute("""
                         INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, estado_asistencia, presente, justificado, motivo_inasistencia)
                         VALUES (%s, %s, %s, %s, %s, %s)
                         ON DUPLICATE KEY UPDATE estado_asistencia = VALUES(estado_asistencia), presente = VALUES(presente),
                                                 justificado = VALUES(justificado), motivo_inasistencia = VALUES(motivo_inasistencia)
                     """, (eval_id, a_id, estado, presente, justificado, motivo))
+                except Exception:
+                    cur.execute("""
+                        INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, presente, justificado, motivo_inasistencia)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE presente = VALUES(presente), justificado = VALUES(justificado),
+                                                motivo_inasistencia = VALUES(motivo_inasistencia)
+                    """, (eval_id, a_id, presente, justificado, motivo))
 
-                    # Si fue inasistencia, registrar o actualizar recuperación
-                    if not presente:
-                        exigencia = 60.00 if justificado else 70.00
+                if not presente:
+                    exigencia = 60.00 if justificado else 70.00
+                    motivo_recup = motivo or ('Salida Pedagógica Oficial' if estado == 'salida' else ('Licencia / Justificado Inspectoría' if justificado else 'Inasistencia sin justificar'))
+                    cur.execute("SELECT id FROM recuperaciones WHERE evaluacion_id = %s AND alumno_id = %s", (eval_id, a_id))
+                    r_exist = cur.fetchone()
+                    if r_exist:
+                        cur.execute("""
+                            UPDATE recuperaciones SET exigencia = %s, motivo = %s WHERE id = %s
+                        """, (exigencia, motivo_recup, r_exist['id']))
+                    else:
                         cur.execute("""
                             INSERT INTO recuperaciones (evaluacion_id, alumno_id, fecha_recuperacion, motivo, exigencia, estado)
                             VALUES (%s, %s, DATE_ADD(CURDATE(), INTERVAL 7 DAY), %s, %s, 'pendiente')
-                            ON DUPLICATE KEY UPDATE exigencia = VALUES(exigencia), motivo = VALUES(motivo)
-                        """, (eval_id, a_id, motivo or 'Inasistencia a evaluación', exigencia))
+                        """, (eval_id, a_id, motivo_recup, exigencia))
             else:
-                asist_val = request.form.get(f'asist_{a_id}')
-                if asist_val:
-                    presente = 1 if asist_val == 'presente' else 0
+                # Profesor titular pasando lista oficial del curso
+                if not estado:
+                    estado = 'presente'
+                presente = 1 if estado == 'presente' else 0
+                justificado = 1 if estado in ['justificado', 'salida'] else 0
+
+                try:
                     cur.execute("""
-                        INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, estado_asistencia, presente, justificado)
-                        VALUES (%s, %s, %s, %s, 0)
-                        ON DUPLICATE KEY UPDATE estado_asistencia = VALUES(estado_asistencia), presente = VALUES(presente)
-                    """, (eval_id, a_id, asist_val, presente))
-                    if not presente:
+                        INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, estado_asistencia, presente, justificado, motivo_inasistencia)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE estado_asistencia = VALUES(estado_asistencia), presente = VALUES(presente),
+                                                justificado = VALUES(justificado), motivo_inasistencia = VALUES(motivo_inasistencia)
+                    """, (eval_id, a_id, estado, presente, justificado, motivo))
+                except Exception:
+                    cur.execute("""
+                        INSERT INTO asistencia_evaluaciones (evaluacion_id, alumno_id, presente, justificado, motivo_inasistencia)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE presente = VALUES(presente), justificado = VALUES(justificado),
+                                                motivo_inasistencia = VALUES(motivo_inasistencia)
+                    """, (eval_id, a_id, presente, justificado, motivo))
+
+                # Si el estudiante faltó (injustificada o salida), crear citación a prueba recuperativa
+                if not presente:
+                    exigencia = 60.00 if justificado else 70.00
+                    motivo_recup = motivo or ('Salida Pedagógica Oficial' if estado == 'salida' else 'Inasistencia sin justificar')
+                    cur.execute("SELECT id FROM recuperaciones WHERE evaluacion_id = %s AND alumno_id = %s", (eval_id, a_id))
+                    r_exist = cur.fetchone()
+                    if r_exist:
+                        cur.execute("""
+                            UPDATE recuperaciones SET exigencia = %s, motivo = %s, estado = 'pendiente' WHERE id = %s
+                        """, (exigencia, motivo_recup, r_exist['id']))
+                    else:
                         cur.execute("""
                             INSERT INTO recuperaciones (evaluacion_id, alumno_id, fecha_recuperacion, motivo, exigencia, estado)
-                            VALUES (%s, %s, DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'Inasistencia sin justificar', 70.00, 'pendiente')
-                            ON DUPLICATE KEY UPDATE estado = VALUES(estado)
-                        """, (eval_id, a_id))
+                            VALUES (%s, %s, DATE_ADD(CURDATE(), INTERVAL 7 DAY), %s, %s, 'pendiente')
+                        """, (eval_id, a_id, motivo_recup, exigencia))
 
         if user['rol'] != 'inspe':
             cur.execute("UPDATE evaluaciones SET asistencia_guardada = 1 WHERE id = %s", (eval_id,))
             flash('Lista de asistencia del curso guardada y cerrada exitosamente.', 'success')
         else:
-            flash('Justificaciones médicas acreditadas exitosamente por Inspectoría General.', 'success')
+            flash('Justificaciones acreditadas exitosamente por Inspectoría General.', 'success')
+    conn.close()
     return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
 
 @app.route('/evaluaciones/api/disponibilidad')

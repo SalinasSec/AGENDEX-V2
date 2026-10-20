@@ -840,18 +840,25 @@ app.post('/evaluaciones/:id/asistencia', requireAuth, requireRole('profe', 'utp'
           justificado
         });
 
-        // Si faltó injustificadamente, asegurar citación a recuperativa (70% sin justificar)
+        // Si faltó (injustificada o salida pedagógica), asegurar citación a recuperativa con exigencia correspondiente
         if (!presente) {
+          const exigencia = justificado ? 60.0 : 70.0;
+          const tipoJust = (estadoFinal === 'salida') ? 'salida_pedagogica' : (justificado ? 'medico' : 'injustificada');
+          const motivoRecup = motivo || (estadoFinal === 'salida' ? 'Salida Pedagógica Oficial' : 'Inasistencia sin justificar');
           const recExistente = store.recuperaciones.find(r => r.alumno_id === alumno.id && r.evaluacion_id === evalId);
           if (!recExistente) {
             store.crearRecuperacion({
               evaluacion_id: evalId,
               alumno_id: alumno.id,
               fecha_recuperacion: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-              motivo: motivo || 'Inasistencia sin justificar',
-              porcentaje_exigencia: 70.0,
-              tipo_justificacion: 'injustificada'
+              motivo: motivoRecup,
+              porcentaje_exigencia: exigencia,
+              tipo_justificacion: tipoJust
             });
+          } else {
+            recExistente.porcentaje_exigencia = exigencia;
+            recExistente.tipo_justificacion = tipoJust;
+            recExistente.motivo = motivoRecup;
           }
         }
       }

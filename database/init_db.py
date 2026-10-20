@@ -159,6 +159,16 @@ def main():
         except Exception as e:
             print(f"    [!] Nota de actualización: {e}")
 
+        ruta_procs = os.path.join(directorio_actual, "procedimientos.sql")
+        if os.path.exists(ruta_procs):
+            print("[+] Instalando procedimientos almacenados (Rúbrica Parte 2)... ")
+            try:
+                sql_procs = leer_archivo_sql(ruta_procs)
+                ejecutar_script_sql(cursor, sql_procs)
+                print("    [OK] Procedimientos almacenados creados exitosamente.")
+            except Exception as ep:
+                print(f"    [!] Nota en procedimientos: {ep}")
+
         print("[+] Cargando datos iniciales (cursos, asignaturas, profesores, alumnos)...")
         if os.path.exists(ruta_datos):
             sql_datos = leer_archivo_sql(ruta_datos)

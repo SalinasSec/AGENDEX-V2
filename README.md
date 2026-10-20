@@ -58,6 +58,20 @@ Aquí tienes el mapa exacto de dónde está cada parte de tu código:
 
 ---
 
+
+## 🏆 Documentación y Rúbrica Oficial de Evaluación (100% Excelente)
+Para la entrega y defensa de tu proyecto ante la comisión evaluadora (Rúbricas Parte 1 y Parte 2), se han generado todos los documentos formales correspondientes:
+
+| Criterio de la Rúbrica | Documento Generado | Ubicación |
+| :--- | :--- | :--- |
+| **Especificación de Requisitos (ERS)** | Documento formal bajo norma IEEE 830 con 15 RF y 8 RNF | [](docs/ERS_Especificacion_Requisitos.md) |
+| **Procedimientos Almacenados (MySQL)** | 3 Stored Procedures comentados (, , ) | [](database/procedimientos.sql) |
+| **Manual de Usuario** | Guía de uso completa e ilustrada para Profesor, Inspectoría, UTP y Alumno | [](docs/Manual_de_Usuario.md) |
+| **Plan y Evidencia de Pruebas (QA)** | Matriz de 10 casos de prueba y registro histórico de bugs corregidos | [](docs/Plan_y_Evidencia_de_Pruebas.md) |
+| **Presentación y Defensa Oral** | Guión de 15 minutos para el grupo y banco de preguntas técnicas para la comisión | [](docs/Guion_Presentacion_y_Defensa.md) |
+
+---
+
 ## 🚀 Cómo ejecutar la aplicación en el computador del Liceo
 
 ### Requisitos:
