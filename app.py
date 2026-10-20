@@ -99,6 +99,17 @@ def enrich_eval(e):
 def enrich_recup(r):
     if not r:
         return r
+    val_exig = r.get('porcentaje_exigencia')
+    if val_exig is None:
+        val_exig = r.get('exigencia')
+    if val_exig is None:
+        val_exig = 60.00
+    try:
+        val_exig = float(val_exig)
+    except (ValueError, TypeError):
+        val_exig = 60.00
+    r['porcentaje_exigencia'] = val_exig
+    r['exigencia'] = val_exig
     r['fecha_recuperacion'] = format_date(r.get('fecha_recuperacion'))
     r['eval_fecha'] = format_date(r.get('eval_fecha'))
     r['evaluacion'] = {

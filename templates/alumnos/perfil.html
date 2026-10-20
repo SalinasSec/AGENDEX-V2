@@ -128,10 +128,10 @@
                                 <strong class="small">{{ rec.eval_titulo if rec.eval_titulo else (rec.evaluacion.titulo if rec.evaluacion else 'Evaluación') }}</strong>
                                 <br><small class="text-muted">Fecha: {{ rec.fecha_recuperacion }}</small>
                                 <br>
-                                {% if rec.porcentaje_exigencia|float >= 70 %}
-                                <span class="badge bg-danger" title="Sin justificar">Exigencia {{ rec.porcentaje_exigencia|int }}%</span>
+                                {% if (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|float >= 70 %}
+                                <span class="badge bg-danger" title="Sin justificar">Exigencia {{ (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|int }}%</span>
                                 {% else %}
-                                <span class="badge bg-success" title="Justificada">Exigencia {{ rec.porcentaje_exigencia|int }}%</span>
+                                <span class="badge bg-success" title="Justificada">Exigencia {{ (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|int }}%</span>
                                 {% endif %}
                             </div>
                             {% if rec.estado == 'pendiente' %}

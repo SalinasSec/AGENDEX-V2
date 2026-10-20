@@ -47,7 +47,7 @@
                             </div>
                             <div class="d-flex justify-content-between mb-1">
                                 <span class="text-muted"><i class="bi bi-shield-check text-success me-1"></i><strong>Exigencia:</strong></span>
-                                {% if rec.porcentaje_exigencia == 60 %}
+                                {% if (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60)) == 60 %}
                                 <span class="badge bg-success" title="Inasistencia justificada reglamentariamente">60% (Justificado)</span>
                                 {% else %}
                                 <span class="badge bg-danger" title="Inasistencia sin justificar oficial">70% (Injustificada)</span>
@@ -191,7 +191,7 @@
                                 </div>
                                 <div class="small">
                                     <span class="text-muted">Exigencia:</span>
-                                    {% if rec.porcentaje_exigencia == 60 %}
+                                    {% if (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60)) == 60 %}
                                     <span class="badge bg-success-subtle text-success border border-success-subtle">60% (Justificado)</span>
                                     {% else %}
                                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle">70% (Injustificada)</span>

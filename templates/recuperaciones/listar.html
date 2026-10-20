@@ -68,10 +68,10 @@
                             <span class="fw-semibold">{{ rec.fecha_recuperacion }}</span>
                         </td>
                         <td class="nowrap">
-                            {% if rec.porcentaje_exigencia|float >= 70 %}
-                            <span class="badge bg-danger" title="Sin justificar (70%)">{{ rec.porcentaje_exigencia|round|int }}%</span>
+                            {% if (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|float >= 70 %}
+                            <span class="badge bg-danger" title="Sin justificar (70%)">{{ (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|round|int }}%</span>
                             {% else %}
-                            <span class="badge bg-success" title="Justificada (60%)">{{ rec.porcentaje_exigencia|round|int }}%</span>
+                            <span class="badge bg-success" title="Justificada (60%)">{{ (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|round|int }}%</span>
                             {% endif %}
                         </td>
                         <td class="text-muted small">{{ rec.motivo or '-' }}</td>
@@ -131,8 +131,8 @@
                             <span class="badge bg-light text-dark border">
                                 <i class="bi bi-calendar-check me-1"></i>Recup: {{ rec.fecha_recuperacion }}
                             </span>
-                            <span class="badge {% if rec.porcentaje_exigencia|float >= 70 %}bg-danger{% else %}bg-success{% endif %}">
-                                {{ rec.porcentaje_exigencia|round|int }}% Exigencia
+                            <span class="badge {% if (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|float >= 70 %}bg-danger{% else %}bg-success{% endif %}">
+                                {{ (rec.porcentaje_exigencia if rec.porcentaje_exigencia is defined else (rec.exigencia if rec.exigencia is defined else 60))|round|int }}% Exigencia
                             </span>
                         </div>
                         {% if rec.motivo %}
