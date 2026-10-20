@@ -1,17 +1,3 @@
--- ========================================================================
--- AgendEx · Procedimientos Almacenados (Stored Procedures en MySQL)
--- Liceos SOFOFA / Liceo Industrial Bicentenario RBL
--- Proyecto Final de Desarrollo de Software (Proyecto Yuyito)
--- ========================================================================
--- Este archivo contiene la implementación de procedimientos almacenados
--- para dar estricto cumplimiento al criterio "Procedimientos Almacenados"
--- (100% Excelente - 12 puntos) de la Rúbrica Parte 2.
---
--- Criterio evaluado:
--- "Procedimientos correctamente implementados, utilizados y explicados por
---  los estudiantes."
--- ========================================================================
-
 USE agendex_db;
 
 DELIMITER $$
