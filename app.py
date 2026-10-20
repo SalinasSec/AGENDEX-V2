@@ -25,6 +25,17 @@ ROLES = {
     'alumno': 'Alumno'
 }
 
+# Asignaciones oficiales por profesor (Liceo Industrial Bicentenario RBL)
+PROFESORES_ASIGNACIONES = {
+    1: {'cursos': [19, 26], 'asignaturas': [7]},         # Marcela Rubio: 3G, 4G / M8
+    2: {'cursos': [19, 26], 'asignaturas': [8, 9, 10]},   # Antonio Velásquez: 3G, 4G / M5, M6, M7
+    3: {'cursos': [1, 2, 7, 12, 19, 26], 'asignaturas': [2]}, # Matemática
+    4: {'cursos': [1, 2, 7, 8, 19, 26], 'asignaturas': [1]},  # Lenguaje
+    5: {'cursos': [1, 2, 7, 19], 'asignaturas': [3]},         # Historia
+    6: {'cursos': [1, 7, 19, 26], 'asignaturas': [4]},        # Inglés
+    7: {'cursos': [7, 8, 9, 10, 11, 12], 'asignaturas': [11]} # Aprestos
+}
+
 # -------------------------------------------------------------
 # HELPERS Y FORMATEADORES
 # -------------------------------------------------------------
@@ -402,11 +413,32 @@ def crear_evaluacion():
         flash(f'Evaluación "{titulo}" creada exitosamente.', 'success')
         return redirect(url_for('detalle_evaluacion', eval_id=nuevo_id))
 
+    prof_id = user.get('profesor_id') if user.get('rol') == 'profe' else None
+    asig_info = PROFESORES_ASIGNACIONES.get(prof_id) if (user.get('rol') == 'profe' and prof_id) else None
+
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM cursos ORDER BY nombre ASC")
-        cursos = cur.fetchall()
-        cur.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
-        asignaturas = cur.fetchall()
+        mi_profesor = None
+        if prof_id:
+            cur.execute("SELECT * FROM profesores WHERE id = %s", (prof_id,))
+            p_row = cur.fetchone()
+            if p_row:
+                p_row['nombre_completo'] = f"{p_row['nombre']} {p_row['apellido']}"
+                mi_profesor = p_row
+
+        if asig_info:
+            c_ids = asig_info['cursos']
+            a_ids = asig_info['asignaturas']
+            fmt_c = ','.join(['%s'] * len(c_ids))
+            cur.execute(f"SELECT * FROM cursos WHERE id IN ({fmt_c}) ORDER BY nombre ASC", tuple(c_ids))
+            cursos = cur.fetchall()
+            fmt_a = ','.join(['%s'] * len(a_ids))
+            cur.execute(f"SELECT * FROM asignaturas WHERE id IN ({fmt_a}) ORDER BY nombre ASC", tuple(a_ids))
+            asignaturas = cur.fetchall()
+        else:
+            cur.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+            cursos = cur.fetchall()
+            cur.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
+            asignaturas = cur.fetchall()
     conn.close()
 
     return render_template(
@@ -415,6 +447,7 @@ def crear_evaluacion():
         active='evaluaciones',
         cursos=cursos,
         asignaturas=asignaturas,
+        mi_profesor=mi_profesor,
         hoy=date.today().strftime('%Y-%m-%d')
     )
 
@@ -576,10 +609,23 @@ def editar_evaluacion(eval_id):
             flash('Evaluación actualizada correctamente.', 'success')
             return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
 
-        cur.execute("SELECT * FROM cursos ORDER BY nombre ASC")
-        cursos = cur.fetchall()
-        cur.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
-        asignaturas = cur.fetchall()
+        user = session.get('user', {})
+        prof_id = user.get('profesor_id') if user.get('rol') == 'profe' else None
+        asig_info = PROFESORES_ASIGNACIONES.get(prof_id) if (user.get('rol') == 'profe' and prof_id) else None
+        if asig_info:
+            c_ids = asig_info['cursos']
+            a_ids = asig_info['asignaturas']
+            fmt_c = ','.join(['%s'] * len(c_ids))
+            cur.execute(f"SELECT * FROM cursos WHERE id IN ({fmt_c}) ORDER BY nombre ASC", tuple(c_ids))
+            cursos = cur.fetchall()
+            fmt_a = ','.join(['%s'] * len(a_ids))
+            cur.execute(f"SELECT * FROM asignaturas WHERE id IN ({fmt_a}) ORDER BY nombre ASC", tuple(a_ids))
+            asignaturas = cur.fetchall()
+        else:
+            cur.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+            cursos = cur.fetchall()
+            cur.execute("SELECT * FROM asignaturas ORDER BY nombre ASC")
+            asignaturas = cur.fetchall()
 
     conn.close()
     ev['fecha'] = format_date(ev.get('fecha'))
@@ -611,6 +657,7 @@ def eliminar_evaluacion(eval_id):
 @login_required
 def recuperaciones():
     user = session['user']
+    estado_filtro = request.args.get('estado', '').strip()
     conn = get_db_connection()
     with conn.cursor() as cur:
         query = """
@@ -625,6 +672,9 @@ def recuperaciones():
             WHERE 1=1
         """
         params = []
+        if estado_filtro:
+            query += " AND r.estado = %s"
+            params.append(estado_filtro)
         if user['rol'] == 'alumno':
             query += " AND r.alumno_id = %s"
             params.append(user.get('alumno_id') or 1)
@@ -641,7 +691,8 @@ def recuperaciones():
         'recuperaciones/listar.html',
         title='Evaluaciones de Recuperación',
         active='recuperaciones',
-        recuperaciones=recs
+        recuperaciones=recs,
+        filtros={'estado': estado_filtro}
     )
 
 @app.route('/recuperaciones/crear', methods=['GET', 'POST'])
@@ -701,25 +752,51 @@ def cambiar_estado_recuperacion(recup_id):
 @app.route('/alumnos')
 @login_required
 def alumnos():
+    user = session.get('user', {})
+    busqueda = request.args.get('busqueda', '').strip()
     curso_id = request.args.get('curso_id', type=int)
+
+    prof_id = user.get('profesor_id') if user.get('rol') == 'profe' else None
+    mis_cursos = PROFESORES_ASIGNACIONES.get(prof_id, {}).get('cursos', []) if prof_id else []
+
     conn = get_db_connection()
     with conn.cursor() as cur:
-        query = "SELECT a.*, c.nombre AS curso_nombre, c.nivel AS curso_nivel FROM alumnos a JOIN cursos c ON a.curso_id = c.id"
+        query = "SELECT a.*, c.nombre AS curso_nombre, c.nivel AS curso_nivel FROM alumnos a JOIN cursos c ON a.curso_id = c.id WHERE 1=1"
         params = []
+        if user.get('rol') == 'profe' and mis_cursos:
+            fmt_c = ','.join(['%s'] * len(mis_cursos))
+            query += f" AND a.curso_id IN ({fmt_c})"
+            params.extend(mis_cursos)
         if curso_id:
-            query += " WHERE a.curso_id = %s"
+            query += " AND a.curso_id = %s"
             params.append(curso_id)
+        if busqueda:
+            query += " AND (a.nombre LIKE %s OR a.apellido LIKE %s OR a.rut LIKE %s)"
+            b_p = f"%{busqueda}%"
+            params.extend([b_p, b_p, b_p])
+
         query += " ORDER BY c.nombre, a.apellido, a.nombre"
         cur.execute(query, params)
         alumnos_list = cur.fetchall()
         for a in alumnos_list:
             a['nombre_completo'] = f"{a['nombre']} {a['apellido']}"
 
-        cur.execute("SELECT * FROM cursos ORDER BY nombre ASC")
+        if user.get('rol') == 'profe' and mis_cursos:
+            fmt_c = ','.join(['%s'] * len(mis_cursos))
+            cur.execute(f"SELECT * FROM cursos WHERE id IN ({fmt_c}) ORDER BY nombre ASC", tuple(mis_cursos))
+        else:
+            cur.execute("SELECT * FROM cursos ORDER BY nombre ASC")
         cursos = cur.fetchall()
     conn.close()
 
-    return render_template('alumnos/listar.html', title='Estudiantes', active='alumnos', alumnos=alumnos_list, cursos=cursos, filtro_curso=curso_id)
+    return render_template(
+        'alumnos/listar.html',
+        title='Estudiantes',
+        active='alumnos',
+        alumnos=alumnos_list,
+        cursos=cursos,
+        filtros={'busqueda': busqueda, 'curso_id': curso_id}
+    )
 
 @app.route('/alumnos/<int:alumno_id>')
 @login_required
