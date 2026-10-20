@@ -243,239 +243,124 @@
                     <p class="mb-0">No hay alumnos registrados en este curso.</p>
                 </div>
                 <% } else if (current_user.rol === 'inspe') { %>
-                    <!-- ========================================== -->
-                    <!-- VISTA ESPECÍFICA PARA INSPECTORÍA GENERAL  -->
-                    <!-- ========================================== -->
-
-                    <!-- Pestañas de navegación interna para Inspectoría -->
-                    <ul class="nav nav-pills mb-3" id="inspectorTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active btn-sm" id="tab-ausentes-btn" data-bs-toggle="pill" data-bs-target="#tab-ausentes" type="button" role="tab">
-                                <i class="bi bi-exclamation-triangle me-1"></i>Inasistencias a Justificar 
-                                <span class="badge bg-danger ms-1"><%= alumnosAfectados.length %></span>
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link btn-sm" id="tab-nomina-btn" data-bs-toggle="pill" data-bs-target="#tab-nomina" type="button" role="tab">
-                                <i class="bi bi-people me-1"></i>Nómina Completa del Curso (<%= alumnos.length %>)
-                            </button>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content" id="inspectorTabsContent">
-                        <!-- Pestaña 1: Inasistencias a Justificar -->
-                        <div class="tab-pane fade show active" id="tab-ausentes" role="tabpanel">
-                            <div class="alert alert-light border border-warning-subtle small mb-3 py-2">
-                                <i class="bi bi-shield-check text-warning me-1"></i>
-                                <strong>Acreditación médica / salida:</strong> Modifica la condición del estudiante ausente. Al seleccionar <em>Justificado (Médico / Licencia)</em> o <em>Salida Pedagógica</em>, su citación a prueba recuperativa se rebajará automáticamente del <strong>70% al 60%</strong>.
-                            </div>
-
-                            <% if (alumnosAfectados.length === 0) { %>
-                                <% if (!ev.asistencia_guardada) { %>
-                                <div class="text-center py-5 bg-light rounded border border-dashed">
-                                    <i class="bi bi-clock-history text-warning fs-1 d-block mb-2"></i>
-                                    <h6 class="fw-bold mb-1">Pase de lista pendiente por el docente</h6>
-                                    <p class="text-muted small mb-3 px-3" style="max-width: 500px; margin: 0 auto;">
-                                        El profesor titular (<strong><%= ev.profesor ? ev.profesor.nombre_completo : 'Docente' %></strong>) aún no ha guardado la lista de asistencia de esta prueba. Actualmente no se registran alumnos en condición de inasistencia en el sistema.
-                                    </p>
-                                    <button class="btn btn-outline-primary btn-sm" onclick="document.getElementById('tab-nomina-btn').click()">
-                                        <i class="bi bi-people me-1"></i>Ver Nómina de <%= ev.curso ? ev.curso.nombre : 'el Curso' %> (<%= alumnos.length %> alumnos)
-                                    </button>
-                                </div>
-                                <% } else { %>
-                                <div class="text-center py-5 bg-light rounded border border-dashed">
-                                    <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
-                                    <h6 class="fw-bold mb-1 text-success">¡Asistencia Completa en Sala!</h6>
-                                    <p class="text-muted small mb-3 px-3" style="max-width: 500px; margin: 0 auto;">
-                                        Todos los estudiantes convocados del curso (<%= alumnos.length %> alumnos) estuvieron presentes en la evaluación. No hay ausencias que requieran justificación en Inspectoría.
-                                    </p>
-                                    <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('tab-nomina-btn').click()">
-                                        <i class="bi bi-people me-1"></i>Ver Nómina del Curso
-                                    </button>
-                                </div>
-                                <% } %>
-                            <% } else { %>
-                                <form method="POST" action="/evaluaciones/<%= ev.id %>/asistencia">
-                                    <!-- Vista Tabla para Pantallas Medianas y Grandes (Tablet / PC) -->
-                                    <div class="table-responsive d-none d-md-block">
-                                        <table class="table table-hover align-middle mb-0">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th style="width: 28%;">Estudiante Ausente</th>
-                                                    <th style="width: 32%;">Condición de Inasistencia</th>
-                                                    <th style="width: 25%;">Folio / Certificado Médico</th>
-                                                    <th class="text-center" style="width: 15%;">Exigencia</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <% alumnosAfectados.forEach(alumno => { %>
-                                                <% 
-                                                    const asist = asistencias[alumno.id]; 
-                                                    let estadoActual = 'injustificada';
-                                                    if (asist) {
-                                                        if (asist.estado_asistencia) estadoActual = asist.estado_asistencia;
-                                                        else if (asist.justificado) estadoActual = 'justificado';
-                                                        else estadoActual = 'injustificada';
-                                                    }
-                                                %>
-                                                <tr>
-                                                    <td>
-                                                        <div class="fw-semibold text-dark"><%= alumno.nombre_completo %></div>
-                                                        <div class="text-muted small font-monospace"><%= alumno.rut %></div>
-                                                    </td>
-                                                    <td>
-                                                        <select name="estado_<%= alumno.id %>" class="form-select form-select-sm select-estado" data-alumno-id="<%= alumno.id %>">
-                                                            <option value="injustificada" <%= estadoActual === 'injustificada' ? 'selected' : '' %>>❌ Inasistencia Injustificada</option>
-                                                            <option value="justificado" <%= estadoActual === 'justificado' ? 'selected' : '' %>>🏥 Justificado (Médico / Licencia)</option>
-                                                            <option value="salida" <%= estadoActual === 'salida' ? 'selected' : '' %>>🚌 Salida Pedagógica Oficial</option>
-                                                            <option value="presente">✅ Presente en Sala</option>
-                                                        </select>
-                                                    </td>
-                                                    <td>
-                                                        <input type="text" name="motivo_<%= alumno.id %>" class="form-control form-control-sm"
-                                                               placeholder="N° Folio o justificativo..."
-                                                               value="<%= (asist && asist.motivo) ? asist.motivo : '' %>"
-                                                               id="motivo_<%= alumno.id %>">
-                                                    </td>
-                                                    <td class="text-center" id="badge_exigencia_<%= alumno.id %>">
-                                                        <% if (estadoActual === 'injustificada') { %>
-                                                        <span class="badge bg-danger" title="70% de exigencia">70%</span>
-                                                        <% } else if (estadoActual === 'salida') { %>
-                                                        <span class="badge bg-info text-dark" title="60% regular">60%</span>
-                                                        <% } else { %>
-                                                        <span class="badge bg-success" title="60% regular">60%</span>
-                                                        <% } %>
-                                                    </td>
-                                                </tr>
-                                                <% }) %>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <!-- Vista Tarjetas Móviles (Para teléfonos o ventanas estrechas) con etiquetas legibles -->
-                                    <div class="d-md-none d-flex flex-column gap-3">
-                                        <% alumnosAfectados.forEach(alumno => { %>
-                                        <% 
-                                            const asist = asistencias[alumno.id]; 
-                                            let estadoActual = 'injustificada';
-                                            if (asist) {
-                                                if (asist.estado_asistencia) estadoActual = asist.estado_asistencia;
-                                                else if (asist.justificado) estadoActual = 'justificado';
-                                                else estadoActual = 'injustificada';
-                                            }
-                                        %>
-                                        <div class="p-3 bg-light rounded border shadow-2xs">
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                <div>
-                                                    <strong class="d-block text-dark"><%= alumno.nombre_completo %></strong>
-                                                    <span class="small text-muted font-monospace"><%= alumno.rut %></span>
-                                                </div>
-                                                <div id="badge_exigencia_mob_<%= alumno.id %>">
-                                                    <% if (estadoActual === 'injustificada') { %>
-                                                    <span class="badge bg-danger">Exigencia 70%</span>
-                                                    <% } else if (estadoActual === 'salida') { %>
-                                                    <span class="badge bg-info text-dark">Exigencia 60%</span>
-                                                    <% } else { %>
-                                                    <span class="badge bg-success">Exigencia 60%</span>
-                                                    <% } %>
-                                                </div>
-                                            </div>
-
-                                            <div class="mb-2">
-                                                <label class="form-label small fw-semibold mb-1">Condición de Asistencia:</label>
-                                                <select name="estado_<%= alumno.id %>" class="form-select form-select-sm select-estado" data-alumno-id="<%= alumno.id %>">
-                                                    <option value="injustificada" <%= estadoActual === 'injustificada' ? 'selected' : '' %>>❌ Inasistencia Injustificada (70%)</option>
-                                                    <option value="justificado" <%= estadoActual === 'justificado' ? 'selected' : '' %>>🏥 Justificado Médico / Licencia (60%)</option>
-                                                    <option value="salida" <%= estadoActual === 'salida' ? 'selected' : '' %>>🚌 Salida Pedagógica Oficial (60%)</option>
-                                                    <option value="presente">✅ Presente en Sala</option>
-                                                </select>
-                                            </div>
-
-                                            <div>
-                                                <label class="form-label small fw-semibold mb-1">Folio / Observación:</label>
-                                                <input type="text" name="motivo_<%= alumno.id %>" class="form-control form-control-sm"
-                                                       placeholder="N° Folio médico o documento..."
-                                                       value="<%= (asist && asist.motivo) ? asist.motivo : '' %>">
-                                            </div>
-                                        </div>
-                                        <% }) %>
-                                    </div>
-
-                                    <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 pt-3 border-top gap-2">
-                                        <small class="text-muted"><i class="bi bi-shield-check me-1"></i>Las justificaciones sincronizan inmediatamente las pruebas recuperativas.</small>
-                                        <button type="submit" class="btn btn-warning px-4 fw-semibold shadow-xs">
-                                            <i class="bi bi-check-lg me-1"></i>Guardar Justificaciones
-                                        </button>
-                                    </div>
-                                </form>
-                            <% } %>
-                        </div>
-
-                        <!-- Pestaña 2: Nómina Completa del Curso -->
-                        <div class="tab-pane fade" id="tab-nomina" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th style="width: 50px;">#</th>
-                                            <th>Estudiante</th>
-                                            <th>RUT</th>
-                                            <th>Condición Actual</th>
-                                            <th>Observación / Folio</th>
-                                            <th class="text-center">Exigencia</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <% alumnos.forEach((alumno, idx) => { %>
-                                        <% 
-                                            const asist = asistencias[alumno.id]; 
-                                            let est = 'presente';
-                                            if (asist) {
-                                                if (asist.estado_asistencia) est = asist.estado_asistencia;
-                                                else if (asist.justificado) est = 'justificado';
-                                                else if (!asist.presente) est = 'injustificada';
-                                            } else if (!ev.asistencia_guardada) {
-                                                est = 'pendiente';
-                                            }
-                                        %>
-                                        <tr>
-                                            <td class="text-muted small"><%= idx + 1 %></td>
-                                            <td>
-                                                <div class="fw-semibold"><%= alumno.nombre_completo %></div>
-                                            </td>
-                                            <td class="text-muted small font-monospace"><%= alumno.rut %></td>
-                                            <td>
-                                                <% if (est === 'pendiente') { %>
-                                                <span class="badge bg-light text-muted border"><i class="bi bi-clock me-1"></i>Pendiente</span>
-                                                <% } else if (est === 'presente') { %>
-                                                <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Presente</span>
-                                                <% } else if (est === 'injustificada') { %>
-                                                <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Inasistencia</span>
-                                                <% } else if (est === 'salida') { %>
-                                                <span class="badge bg-info text-dark"><i class="bi bi-bus-front me-1"></i>Salida Pedagógica</span>
-                                                <% } else { %>
-                                                <span class="badge bg-success"><i class="bi bi-file-earmark-medical me-1"></i>Justificado</span>
-                                                <% } %>
-                                            </td>
-                                            <td class="text-muted small"><%= (asist && asist.motivo) ? asist.motivo : '-' %></td>
-                                            <td class="text-center">
-                                                <% if (est === 'injustificada') { %>
-                                                <span class="badge bg-danger">70%</span>
-                                                <% } else if (est === 'justificado' || est === 'salida') { %>
-                                                <span class="badge bg-success">60%</span>
-                                                <% } else { %>
-                                                <span class="text-muted small">&mdash;</span>
-                                                <% } %>
-                                            </td>
-                                        </tr>
-                                        <% }) %>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                    <!-- ============================================================== -->
+                    <!-- VISTA DE ACREDITACIÓN DE JUSTIFICATIVOS (INSPECTORÍA GENERAL) -->
+                    <!-- ============================================================== -->
+                    <div class="alert alert-light border border-warning-subtle small mb-3 py-2">
+                        <i class="bi bi-shield-check text-warning me-1"></i>
+                        <strong>Atribución de Inspectoría:</strong> El pase de lista lo realiza el profesor en sala. Aquí Inspectoría acredita licencias médicas o salidas pedagógicas para los estudiantes que faltaron, rebajando su exigencia en la prueba recuperativa del <strong>70% al 60%</strong>.
                     </div>
 
-                <% } else if (esProfeObservador) { %>
+                    <% if (!ev.asistencia_guardada) { %>
+                    <div class="text-center py-5 bg-light rounded border border-dashed my-3">
+                        <i class="bi bi-clock-history text-warning fs-1 d-block mb-2"></i>
+                        <h6 class="fw-bold mb-1">Pase de lista pendiente por el docente</h6>
+                        <p class="text-muted small mb-0 px-3" style="max-width: 520px; margin: 0 auto;">
+                            El profesor titular (<strong><%= ev.profesor ? ev.profesor.nombre_completo : 'Docente' %></strong>) aún no ha guardado la lista de asistencia en sala. Una vez que el docente registre la asistencia, los estudiantes ausentes aparecerán aquí para acreditar sus justificativos médicos.
+                        </p>
+                    </div>
+
+                    <h6 class="fw-bold small text-muted text-uppercase mt-4 mb-2">Nómina del curso (<%= alumnos.length %> alumnos convocados)</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th>Estudiante</th>
+                                    <th>RUT</th>
+                                    <th>Estado Asistencia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% alumnos.forEach((alumno, idx) => { %>
+                                <tr>
+                                    <td class="text-muted small"><%= idx + 1 %></td>
+                                    <td><strong><%= alumno.nombre_completo %></strong></td>
+                                    <td class="text-muted small font-monospace"><%= alumno.rut %></td>
+                                    <td><span class="badge bg-light text-muted border"><i class="bi bi-clock me-1"></i>Pendiente por docente</span></td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <% } else if (alumnosAfectados.length === 0) { %>
+                    <div class="text-center py-5 bg-light rounded border border-dashed my-3">
+                        <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
+                        <h6 class="fw-bold mb-1 text-success">¡Asistencia Completa en Sala!</h6>
+                        <p class="text-muted small mb-0 px-3" style="max-width: 520px; margin: 0 auto;">
+                            Todos los estudiantes convocados del curso (<%= alumnos.length %> alumnos) asistieron a la evaluación. No hay ausencias que requieran justificación médica en Inspectoría.
+                        </p>
+                    </div>
+
+                    <% } else { %>
+                    <!-- Formulario de Acreditación de Justificaciones Médicas para Alumnos Ausentes -->
+                    <form method="POST" action="/evaluaciones/<%= ev.id %>/asistencia">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 28%;">Estudiante Ausente</th>
+                                        <th style="width: 34%;">Condición de Inasistencia</th>
+                                        <th style="width: 26%;">Folio / Certificado Médico</th>
+                                        <th class="text-center" style="width: 12%;">Exigencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% alumnosAfectados.forEach(alumno => { %>
+                                    <% 
+                                        const asist = asistencias[alumno.id]; 
+                                        let estadoActual = 'injustificada';
+                                        if (asist) {
+                                            let st = asist.estado_asistencia;
+                                            if (Array.isArray(st)) st = st[0];
+                                            if (st) estadoActual = st;
+                                            else if (asist.justificado) estadoActual = 'justificado';
+                                            else estadoActual = 'injustificada';
+                                        }
+                                        let mot = asist ? asist.motivo : '';
+                                        if (Array.isArray(mot)) mot = mot[0];
+                                    %>
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold text-dark"><%= alumno.nombre_completo %></div>
+                                            <div class="text-muted small font-monospace"><%= alumno.rut %></div>
+                                        </td>
+                                        <td>
+                                            <select name="estado_<%= alumno.id %>" class="form-select form-select-sm select-estado" data-alumno-id="<%= alumno.id %>">
+                                                <option value="injustificada" <%= estadoActual === 'injustificada' ? 'selected' : '' %>>❌ Inasistencia Injustificada (70%)</option>
+                                                <option value="justificado" <%= (estadoActual === 'justificado' || estadoActual === 'licencia') ? 'selected' : '' %>>🏥 Justificado con Certificado Médico (60%)</option>
+                                                <option value="salida" <%= estadoActual === 'salida' ? 'selected' : '' %>>🚌 Salida Pedagógica Oficial (60%)</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="text" name="motivo_<%= alumno.id %>" class="form-control form-control-sm"
+                                                   placeholder="N° Folio o documento médico..."
+                                                   value="<%= mot || '' %>"
+                                                   id="motivo_<%= alumno.id %>">
+                                        </td>
+                                        <td class="text-center" id="badge_exigencia_<%= alumno.id %>">
+                                            <% if (estadoActual === 'injustificada') { %>
+                                            <span class="badge bg-danger" title="70% de exigencia">70%</span>
+                                            <% } else { %>
+                                            <span class="badge bg-success" title="60% regular">60%</span>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 pt-3 border-top gap-2">
+                            <small class="text-muted"><i class="bi bi-shield-check me-1"></i>Al guardar, las pruebas recuperativas se actualizan automáticamente al 60% o 70%.</small>
+                            <button type="submit" class="btn btn-warning px-4 fw-semibold shadow-xs">
+                                <i class="bi bi-check-lg me-1"></i>Guardar Justificaciones
+                            </button>
+                        </div>
+                    </form>
+                    <% } %>
+<% } else if (esProfeObservador) { %>
                     <!-- ============================================================== -->
                     <!-- VISTA PARA PROFESOR OBSERVADOR (No es titular de esta prueba)   -->
                     <!-- ============================================================== -->

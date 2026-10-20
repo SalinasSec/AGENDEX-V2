@@ -511,11 +511,18 @@ def asistencia_evaluacion(eval_id):
                         VALUES (%s, %s, %s, %s, 0)
                         ON DUPLICATE KEY UPDATE estado_asistencia = VALUES(estado_asistencia), presente = VALUES(presente)
                     """, (eval_id, a_id, asist_val, presente))
+                    if not presente:
+                        cur.execute("""
+                            INSERT INTO recuperaciones (evaluacion_id, alumno_id, fecha_recuperacion, motivo, exigencia, estado)
+                            VALUES (%s, %s, DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'Inasistencia sin justificar', 70.00, 'pendiente')
+                            ON DUPLICATE KEY UPDATE estado = VALUES(estado)
+                        """, (eval_id, a_id))
 
-        cur.execute("UPDATE evaluaciones SET asistencia_guardada = 1 WHERE id = %s", (eval_id,))
-    conn.close()
-
-    flash('Asistencia guardada correctamente.', 'success')
+        if user['rol'] != 'inspe':
+            cur.execute("UPDATE evaluaciones SET asistencia_guardada = 1 WHERE id = %s", (eval_id,))
+            flash('Lista de asistencia del curso guardada y cerrada exitosamente.', 'success')
+        else:
+            flash('Justificaciones médicas acreditadas exitosamente por Inspectoría General.', 'success')
     return redirect(url_for('detalle_evaluacion', eval_id=eval_id))
 
 @app.route('/evaluaciones/api/disponibilidad')

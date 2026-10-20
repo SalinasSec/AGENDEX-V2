@@ -105,11 +105,21 @@
                         <strong>Atribución exclusiva de Inspectoría:</strong> Se muestran únicamente los alumnos en condición de inasistencia. Puedes justificar por razones médicas/fuerza mayor o salida pedagógica oficial.
                     </div>
 
-                    {% if alumnos_afectados|length == 0 %}
-                    <div class="text-center py-4">
-                        <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>
-                        <h6 class="fw-bold mb-1">Sin inasistencias pendientes</h6>
-                        <p class="text-muted small mb-0">No se registran alumnos ausentes para esta evaluación o todos se encuentran presentes en sala.</p>
+                    {% if not ev.asistencia_guardada %}
+                    <div class="text-center py-5 bg-light rounded border border-dashed my-3">
+                        <i class="bi bi-clock-history text-warning fs-1 d-block mb-2"></i>
+                        <h6 class="fw-bold mb-1">Pase de lista pendiente por el docente</h6>
+                        <p class="text-muted small mb-0 px-3" style="max-width: 520px; margin: 0 auto;">
+                            El profesor titular aún no ha guardado la lista de asistencia en sala. Una vez que el docente registre la asistencia, los estudiantes ausentes aparecerán aquí para acreditar sus justificativos médicos.
+                        </p>
+                    </div>
+                    {% elif alumnos_afectados|length == 0 %}
+                    <div class="text-center py-5 bg-light rounded border border-dashed my-3">
+                        <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-2"></i>
+                        <h6 class="fw-bold mb-1 text-success">¡Asistencia Completa en Sala!</h6>
+                        <p class="text-muted small mb-0 px-3" style="max-width: 520px; margin: 0 auto;">
+                            Todos los estudiantes convocados del curso asistieron a la evaluación. No hay ausencias que requieran justificación médica en Inspectoría.
+                        </p>
                     </div>
                     {% else %}
                     <form method="POST" action="/evaluaciones/{{ ev.id }}/asistencia">
